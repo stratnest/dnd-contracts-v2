@@ -9,7 +9,7 @@
     "url": "https://github.com/ariadne-finance/dnd-contracts-v2/issues"
   },
   "scripts": {
-    "lint": "solhint `find contracts -type f -name *sol`"
+    "lint": "solhint `find contracts -type f -name \\*sol`"
   },
   "dependencies": {
     "@aave/core-v3": "^1.18.0",

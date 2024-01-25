@@ -1,4 +1,3 @@
-/* solhint-disable no-inline-assembly */
 pragma solidity ^0.8.23;
 
 import { IERC20Metadata } from "@openzeppelin/contracts/token/ERC20/extensions/IERC20Metadata.sol";

@@ -520,28 +520,18 @@ contract DeltaNeutralDollar2 is IFlashLoanRecipient, ERC20Upgradeable, OwnableUp
         revert(ERROR_UNKNOWN_FLASHLOAN_MODE);
     }
 
-    function _collect(address tokenAddress, address to) internal {
-        if (tokenAddress == address(0)) {
-            if (address(this).balance == 0) {
-                return;
-            }
-
+    /// @notice Allows the contract owner to recover misplaced tokens.
+    /// The function can only be invoked by the contract owner.
+    /// @param token An address of token contractfrom which tokens will be collected.
+    /// @param to The recipient address where all retrieved tokens will be transferred.
+    function rescue(address token, address to) public onlyOwner {
+        // note: no zero-balance assertions or protections, we assume the owner knows what is he doing
+        if (token == address(0)) {
             payable(to).transfer(address(this).balance);
-
             return;
         }
 
-        IERC20(tokenAddress).transfer(to, IERC20(tokenAddress).balanceOf(address(this)));
-    }
-
-    /// @notice Allows the contract owner to recover misplaced tokens.
-    /// The function can only be invoked by the contract owner.
-    /// @param tokens An array of token contract addresses from which tokens will be collected.
-    /// @param to The recipient address where all retrieved tokens will be transferred.
-    function collectTokens(address[] memory tokens, address to) public onlyOwner {
-        for (uint256 i=0; i<tokens.length; i++) {
-            _collect(tokens[i], to);
-        }
+        IERC20(token).transfer(to, IERC20(token).balanceOf(address(this)));
     }
 
     /// @notice Deposit funds into vault

@@ -580,9 +580,9 @@ describe("DeltaNeutralDollar2", function() {
     await expect(deltaNeutralDollar.setSettings(settings)).to.be.revertedWithCustomError(deltaNeutralDollar, "OwnableUnauthorizedAccount");
   });
 
-  it("only owner can collect tokens", async () => {
+  it("only owner can rescue tokens", async () => {
     await deltaNeutralDollar.deposit(ONE_ETHER, myAccount.address);
-    await expect(deltaNeutralDollar.collectTokens([ await wsteth.getAddress() ], myAccount.address)).to.be.revertedWithCustomError(deltaNeutralDollar, "OwnableUnauthorizedAccount");
+    await expect(deltaNeutralDollar.rescue(await wsteth.getAddress(), myAccount.address)).to.be.revertedWithCustomError(deltaNeutralDollar, "OwnableUnauthorizedAccount");
   });
 
   it("caps are respected", async () => {
@@ -630,7 +630,7 @@ describe("DeltaNeutralDollar2", function() {
     await deltaNeutralDollar.deposit(ONE_ETHER, myAccount.address);
 
     const before = await wsteth.balanceOf(myAccount.address);
-    await deltaNeutralDollar.connect(ownerAccount).collectTokens([ await wsteth.getAddress() ], myAccount.address);
+    await deltaNeutralDollar.connect(ownerAccount).rescue(await wsteth.getAddress(), myAccount.address);
     const after = await wsteth.balanceOf(myAccount.address);
     const diff = after - before - (ONE_ETHER / 2n);
 

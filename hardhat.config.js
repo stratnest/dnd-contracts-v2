@@ -2,7 +2,6 @@ require('dotenv/config');
 
 require('@nomicfoundation/hardhat-chai-matchers');
 require('@nomiclabs/hardhat-etherscan');
-require('hardhat-deploy');
 require('hardhat-abi-exporter');
 require('hardhat-contract-sizer');
 require('solidity-docgen');

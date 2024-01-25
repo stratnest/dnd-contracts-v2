@@ -8,8 +8,6 @@ import { IPoolAddressesProvider } from "@aave/core-v3/contracts/interfaces/IPool
 
 import "./ISwapHelper.sol";
 
-import "hardhat/console.sol";
-
 contract SwapHelperEmulator is ISwapHelper {
     address private custodian;
     address private wstethToken;
@@ -31,8 +29,6 @@ contract SwapHelperEmulator is ISwapHelper {
         override
         returns (uint256)
     {
-        console.log("sender", msg.sender);
-        console.log("amount", amount);
         IERC20(from).transferFrom(msg.sender, address(this), amount);
 
         uint256 wstethPrice = oracle().getAssetPrice(address(wstethToken));
@@ -55,7 +51,7 @@ contract SwapHelperEmulator is ISwapHelper {
         revert("WTF");
     }
 
-    function calcSwapFee(address from, address to, uint256 amount) // solhint-disable-line no-unused-vars
+    function calcSwapFee(address from, address to, uint256 amount)
         public
         view
         override

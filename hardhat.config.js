@@ -5,6 +5,9 @@ require('@nomicfoundation/hardhat-ignition');
 require('hardhat-abi-exporter');
 require('hardhat-contract-sizer');
 require('solidity-docgen');
+const helpers = require('@nomicfoundation/hardhat-network-helpers');
+
+task('mine6', "Mine 6 blocks").setAction(() => helpers.mine(6));
 
 const accounts = process.env.PRIVATE_KEY ? [ process.env.PRIVATE_KEY ] : undefined;
 

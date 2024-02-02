@@ -5,7 +5,7 @@ import { UUPSUpgradeable } from "@openzeppelin/contracts-upgradeable/proxy/utils
 import { IERC20 } from "@openzeppelin/contracts/interfaces/IERC20.sol";
 import { ILaunchBridge } from "./interfaces/ILaunchBridge.sol";
 
-interface IWETH {
+interface IWETHForBaseSol {
     function withdraw(uint wad) external;
 }
 
@@ -36,7 +36,7 @@ contract Base is OwnableUpgradeable, UUPSUpgradeable { // FIXME review proxy
 
         uint256 amountWeth = IERC20(weth).balanceOf(address(this));
         if (amountWeth > 0) {
-            IWETH(weth).withdraw(amountWeth);
+            IWETHForBaseSol(weth).withdraw(amountWeth);
         }
 
         uint256 amountEth = address(this).balance;

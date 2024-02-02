@@ -1,5 +1,6 @@
 pragma solidity ^0.8.23;
 
+import { IERC20 } from "@openzeppelin/contracts/interfaces/IERC20.sol";
 import { IERC20Metadata } from "@openzeppelin/contracts/token/ERC20/extensions/IERC20Metadata.sol";
 import { ERC20Upgradeable } from "@openzeppelin/contracts-upgradeable/token/ERC20/ERC20Upgradeable.sol";
 import { OwnableUpgradeable } from "@openzeppelin/contracts-upgradeable/access/OwnableUpgradeable.sol";
@@ -7,9 +8,6 @@ import { SignedMath } from "@openzeppelin/contracts/utils/math/SignedMath.sol";
 import { Math } from "@openzeppelin/contracts/utils/math/Math.sol";
 import { SafeCast } from "@openzeppelin/contracts/utils/math/SafeCast.sol";
 import { UUPSUpgradeable } from "@openzeppelin/contracts-upgradeable/proxy/utils/UUPSUpgradeable.sol";
-
-import { IVault, IERC20 } from "@balancer-labs/v2-interfaces/contracts/vault/IVault.sol";
-import { IFlashLoanRecipient } from "@balancer-labs/v2-interfaces/contracts/vault/IFlashLoanRecipient.sol";
 
 import { IPool } from "@aave/core-v3/contracts/interfaces/IPool.sol";
 import { IAaveOracle } from "@aave/core-v3/contracts/interfaces/IAaveOracle.sol";
@@ -45,9 +43,18 @@ string constant ERROR_POSITION_CLOSED = "DND-07";
 string constant ERROR_POSITION_UNCHANGED = "DND-08";
 string constant ERROR_IMPOSSIBLE_MODE = "DND-09";
 
+interface BalancerVaultForDeltaNeutralDollar {
+    function flashLoan(
+        address recipient,
+        IERC20[] calldata tokens,
+        uint256[] calldata amounts,
+        bytes calldata userData
+    ) external;
+}
+
 /// @title Delta-neutral dollar vault
 
-contract DeltaNeutralDollar2 is IFlashLoanRecipient, ERC20Upgradeable, OwnableUpgradeable, UUPSUpgradeable {
+contract DeltaNeutralDollar2 is ERC20Upgradeable, OwnableUpgradeable, UUPSUpgradeable {
     /// @notice Settings are documented in the code
     struct Settings {
         /// @notice Address of the contract that implements asset swapping functionality.
@@ -80,7 +87,7 @@ contract DeltaNeutralDollar2 is IFlashLoanRecipient, ERC20Upgradeable, OwnableUp
 
     IPoolAddressesProvider private aaveAddressProvider;
 
-    IVault private balancerVault; // FIXME remove types?
+    address private balancerVault; // FIXME remove types?
 
     IPool private pool;
     IAaveOracle private oracle;
@@ -159,7 +166,7 @@ contract DeltaNeutralDollar2 is IFlashLoanRecipient, ERC20Upgradeable, OwnableUp
 
         settings = _settings;
 
-        balancerVault = IVault(_balancerVault);
+        balancerVault = _balancerVault;
 
         mainToken = IERC20(_mainToken);
         stableToken = IERC20(_stableToken);
@@ -194,7 +201,7 @@ contract DeltaNeutralDollar2 is IFlashLoanRecipient, ERC20Upgradeable, OwnableUp
     }
 
     modifier onlyBalancerVault() {
-        require(msg.sender == address(balancerVault), ERROR_ONLY_FLASHLOAN_LENDER);
+        require(msg.sender == balancerVault, ERROR_ONLY_FLASHLOAN_LENDER);
         _;
     }
 
@@ -452,7 +459,7 @@ contract DeltaNeutralDollar2 is IFlashLoanRecipient, ERC20Upgradeable, OwnableUp
 
         assert(stableToken.balanceOf(address(this)) >= flashLoanStable);
 
-        stableToken.transfer(address(balancerVault), flashLoanStable);
+        stableToken.transfer(balancerVault, flashLoanStable);
 
         uint256 dustStable = stableToken.balanceOf(address(this));
         if (dustStable > 0) {
@@ -469,7 +476,7 @@ contract DeltaNeutralDollar2 is IFlashLoanRecipient, ERC20Upgradeable, OwnableUp
 
         swap(stableToken, mainToken, stableToken.balanceOf(address(this)));
 
-        mainToken.transfer(address(balancerVault), flashLoanMain);
+        mainToken.transfer(balancerVault, flashLoanMain);
     }
 
     function receiveFlashLoanRepayThenWithdraw(uint256 flashLoanMain, uint256 repayDebtMain, uint256 withdrawCollateralBase) internal {
@@ -482,11 +489,11 @@ contract DeltaNeutralDollar2 is IFlashLoanRecipient, ERC20Upgradeable, OwnableUp
 
         swap(stableToken, mainToken, withdrawCollateralStable);
 
-        mainToken.transfer(address(balancerVault), flashLoanMain);
+        mainToken.transfer(balancerVault, flashLoanMain);
     }
 
     function receiveFlashLoan(
-        IERC20[] memory tokens,
+        address[] memory tokens,
         uint256[] memory amounts,
         uint256[] memory feeAmounts, // solhint-disable-line no-unused-vars
         bytes memory userData
@@ -497,20 +504,20 @@ contract DeltaNeutralDollar2 is IFlashLoanRecipient, ERC20Upgradeable, OwnableUp
         (uint8 mode) = abi.decode(userData, (uint8));
 
         if (mode == FLASH_LOAN_MODE_REBALANCE_SUPPLY_AND_BORROW) {
-            require(tokens.length == 1 && tokens[0] == stableToken, ERROR_INCORRECT_FLASHLOAN_TOKEN_RECEIVED);
+            require(tokens.length == 1 && tokens[0] == address(stableToken), ERROR_INCORRECT_FLASHLOAN_TOKEN_RECEIVED);
             (, uint256 borrowDebtMain, uint256 positionStable) = abi.decode(userData, (uint8, uint256, uint256));
             receiveFlashLoanRebalanceSupplyAndBorrow(amounts[0], positionStable, borrowDebtMain);
             return;
         }
 
         if (mode == FLASH_LOAN_MODE_CLOSE_POSITION) {
-            require(tokens.length == 1 && tokens[0] == mainToken, ERROR_INCORRECT_FLASHLOAN_TOKEN_RECEIVED);
+            require(tokens.length == 1 && tokens[0] == address(mainToken), ERROR_INCORRECT_FLASHLOAN_TOKEN_RECEIVED);
             receiveFlashLoanClosePosition(amounts[0]);
             return;
         }
 
         if (mode == FLASH_LOAN_MODE_REBALANCE_REPAY_THEN_WITHDRAW) {
-            require(tokens.length == 1 && tokens[0] == mainToken, ERROR_INCORRECT_FLASHLOAN_TOKEN_RECEIVED);
+            require(tokens.length == 1 && tokens[0] == address(mainToken), ERROR_INCORRECT_FLASHLOAN_TOKEN_RECEIVED);
             (, uint256 repayDebtMain, uint256 withdrawCollateralBase) = abi.decode(userData, (uint8, uint256, uint256));
             receiveFlashLoanRepayThenWithdraw(amounts[0], repayDebtMain, withdrawCollateralBase);
             return;
@@ -651,7 +658,7 @@ contract DeltaNeutralDollar2 is IFlashLoanRecipient, ERC20Upgradeable, OwnableUp
         uint256[] memory amounts = new uint256[](1);
         amounts[0] = amount;
 
-        balancerVault.flashLoan(IFlashLoanRecipient(this), tokens, amounts, userData);
+        BalancerVaultForDeltaNeutralDollar(balancerVault).flashLoan(address(this), tokens, amounts, userData);
     }
 
     function convertBaseToStable(uint256 amount, uint256 stablePrice) internal view returns (uint256) {

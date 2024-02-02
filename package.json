@@ -15,6 +15,7 @@
     "@aave/core-v3": "^1.18.0",
     "@balancer-labs/v2-interfaces": "^0.4.0",
     "@connext/interfaces": "^2.0.5",
+    "@nomicfoundation/hardhat-ignition-ethers": "^0.13.2",
     "@nomicfoundation/hardhat-toolbox": "^4.0.0",
     "@nomiclabs/hardhat-etherscan": "^3.1.7",
     "@openzeppelin/contracts-upgradeable": "^5.0.1",

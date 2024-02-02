@@ -8,23 +8,23 @@ import { IConnext } from "@connext/interfaces/core/IConnext.sol";
 uint32 constant ETHEREUM = 6648936;
 
 contract Collector is OwnableUpgradeable, UUPSUpgradeable { // FIXME review proxy
+// FIXME deploy using old methods
     address public connext;
     address public base;
-    address[] public tokens;
     uint256 public slippage;
+
+    address[] private tokens;
 
     event Push(address indexed token, uint256 amount, uint256 fee);
 
     function initialize(
         address _connext,
-        address _base,
         address[] memory _tokens
     )
         public
         initializer
     {
         connext = _connext;
-        base = _base;
 
         slippage = 500; // bps
 
@@ -52,7 +52,12 @@ contract Collector is OwnableUpgradeable, UUPSUpgradeable { // FIXME review prox
 
     function _authorizeUpgrade(address) internal override onlyOwner {} // FIXME what is it
 
+    function getTokens() public view returns (address[] memory) {
+        return tokens;
+    }
+
     function push(address token, uint256 relayerFee) public payable onlyAllowedToken(token) {
+        require(base != address(0), "base is not set");
         require(msg.value >= relayerFee, "insufficient fee");
 
         uint256 amount = IERC20(token).balanceOf(address(this));

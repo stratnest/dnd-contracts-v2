@@ -6,8 +6,6 @@ require('hardhat-abi-exporter');
 require('hardhat-contract-sizer');
 require('solidity-docgen');
 
-extendEnvironment(require('./utils/deployHelper.js'));
-
 const accounts = process.env.PRIVATE_KEY ? [ process.env.PRIVATE_KEY ] : undefined;
 
 module.exports = {

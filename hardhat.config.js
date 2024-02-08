@@ -1,10 +1,9 @@
-require('dotenv/config');
-
 require('@nomicfoundation/hardhat-chai-matchers');
-require('@nomicfoundation/hardhat-ignition');
+require('@nomicfoundation/hardhat-verify');
 require('hardhat-abi-exporter');
 require('hardhat-contract-sizer');
 require('solidity-docgen');
+
 const helpers = require('@nomicfoundation/hardhat-network-helpers');
 
 const INFURA_API_KEY = vars.get('INFURA_API_KEY');

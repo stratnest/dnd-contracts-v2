@@ -1,9 +1,0 @@
-{
-  "Collector": {
-    "connext": "0xEE9deC2712cCE65174B561151701Bf54b99C24C8",
-    "allowedTokens": [
-      "0xDA10009cBd5D07dd0CeCc66161FC93D7c9000da1",
-      "0x82aF49447D8a07e3bd95BD0d56f35241523fBab1"
-    ]
-  }
-}

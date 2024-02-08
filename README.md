@@ -13,7 +13,7 @@ Copy `.env_example` into `.env` and edit appropriately.
 Fork Arbitrum One, Optimism, Polygon or Base:
 
 ```bash
-npx hardhat node --fork https://polygon-mainnet.infura.io/v3/YOU_API_KEY --no-deploy
+npx hardhat node --fork https://arbitrum-mainnet.infura.io/v3/YOU_API_KEY --no-deploy
 ```
 
 Then run test:

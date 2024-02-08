@@ -8,7 +8,7 @@ import { IConnext } from "@connext/interfaces/core/IConnext.sol";
 uint32 constant ETHEREUM = 6648936;
 
 contract Collector is Ownable {
-    address public connext;
+    address public immutable connext;
     address public base;
     uint256 public slippage;
 
@@ -43,7 +43,7 @@ contract Collector is Ownable {
         _;
     }
 
-    function getTokens()
+    function getAllowedTokens()
         public
         view
         returns (address[] memory)
@@ -95,6 +95,13 @@ contract Collector is Ownable {
         onlyOwner
     {
         slippage = _slippage;
+    }
+
+    function setAllowedTokens(address[] memory _tokens)
+        public
+        onlyOwner
+    {
+        tokens = _tokens;
     }
 
     function rescue(address token, address to)

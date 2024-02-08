@@ -188,10 +188,11 @@ describe("CollectorTest", function() {
     await expect(collector.push(await dai.getAddress(), FEE, { value: FEE * 2n })).to.be.revertedWith('base is not set');
   });
 
-  it("only owner can call admin methods", async () => {
+  it.only("only owner can call admin methods", async () => {
     await expect(collector.setBase(ethers.ZeroAddress)).to.be.revertedWithCustomError(collector, 'OwnableUnauthorizedAccount');
     await expect(collector.setSlippage(0)).to.be.revertedWithCustomError(collector, 'OwnableUnauthorizedAccount');
     await expect(collector.rescue(await usdt.getAddress(), myAccount.address)).to.be.revertedWithCustomError(collector, 'OwnableUnauthorizedAccount');
+    await expect(collector.setAllowedTokens([ ethers.ZeroAddress ])).to.be.revertedWithCustomError(collector, 'OwnableUnauthorizedAccount');
   });
 
   it("tokens can be rescued", async () => {

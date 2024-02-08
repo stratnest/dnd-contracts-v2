@@ -1,14 +1,13 @@
+// SPDX-License-Identifier: MIT
 pragma solidity ^0.8.23;
 
-import { OwnableUpgradeable } from "@openzeppelin/contracts-upgradeable/access/OwnableUpgradeable.sol";
-import { UUPSUpgradeable } from "@openzeppelin/contracts-upgradeable/proxy/utils/UUPSUpgradeable.sol";
+import { Ownable } from "@openzeppelin/contracts/access/Ownable.sol";
 import { IERC20 } from "@openzeppelin/contracts/interfaces/IERC20.sol";
 import { IConnext } from "@connext/interfaces/core/IConnext.sol";
 
 uint32 constant ETHEREUM = 6648936;
 
-contract Collector is OwnableUpgradeable, UUPSUpgradeable { // FIXME review proxy
-// FIXME deploy using old methods
+contract Collector is Ownable {
     address public connext;
     address public base;
     uint256 public slippage;
@@ -17,12 +16,8 @@ contract Collector is OwnableUpgradeable, UUPSUpgradeable { // FIXME review prox
 
     event Push(address indexed token, uint256 amount, uint256 fee);
 
-    function initialize(
-        address _connext,
-        address[] memory _tokens
-    )
-        public
-        initializer
+    constructor(address _connext, address[] memory _tokens)
+        Ownable(msg.sender)
     {
         connext = _connext;
 
@@ -31,8 +26,6 @@ contract Collector is OwnableUpgradeable, UUPSUpgradeable { // FIXME review prox
         for (uint i = 0; i < _tokens.length; i++) {
             tokens.push(_tokens[i]);
         }
-
-        _transferOwnership(msg.sender);
     }
 
     modifier onlyAllowedToken(address token) {
@@ -50,13 +43,19 @@ contract Collector is OwnableUpgradeable, UUPSUpgradeable { // FIXME review prox
         _;
     }
 
-    function _authorizeUpgrade(address) internal override onlyOwner {} // FIXME what is it
-
-    function getTokens() public view returns (address[] memory) {
+    function getTokens()
+        public
+        view
+        returns (address[] memory)
+    {
         return tokens;
     }
 
-    function push(address token, uint256 relayerFee) public payable onlyAllowedToken(token) {
+    function push(address token, uint256 relayerFee)
+        public
+        payable
+        onlyAllowedToken(token)
+    {
         require(base != address(0), "base is not set");
         require(msg.value >= relayerFee, "insufficient fee");
 
@@ -67,14 +66,14 @@ contract Collector is OwnableUpgradeable, UUPSUpgradeable { // FIXME review prox
         IERC20(token).approve(connext, amount);
 
         bytes memory callData;
-        IConnext(connext).xcall{value: msg.value}( // explicitly send all caller's fee to Connext
-            ETHEREUM, // _destination: Domain ID of the destination chain
-            base,     // _to: address of the target contract
-            token,    // _asset: address of the token contract
+        IConnext(connext).xcall{value: msg.value}( // explicitly send the whole of caller's fee to Connext
+            ETHEREUM, // _destination
+            base,     // _to: destination address
+            token,    // _asset
             owner(),  // _delegate: address that can revert or forceLocal on destination
             amount,   // _amount: amount of tokens to transfer
-            slippage, // _slippage: max slippage the user will accept in BPS (e.g. 300 = 3%)
-            callData  // _callData: the encoded calldata to send
+            slippage, // _slippage: max slippage in BPS (e.g. 300 = 3%)
+            callData
         );
 
         if (IERC20(token).allowance(address(this), connext) > 0) {
@@ -84,15 +83,24 @@ contract Collector is OwnableUpgradeable, UUPSUpgradeable { // FIXME review prox
         emit Push(token, amount, msg.value);
     }
 
-    function setBase(address _base) public onlyOwner {
+    function setBase(address _base)
+        public
+        onlyOwner
+    {
         base = _base;
     }
 
-    function setSlippage(uint256 _slippage) public onlyOwner {
+    function setSlippage(uint256 _slippage)
+        public
+        onlyOwner
+    {
         slippage = _slippage;
     }
 
-    function rescue(address token, address to) public onlyOwner {
+    function rescue(address token, address to)
+        public
+        onlyOwner
+    {
         if (token == address(0)) {
             payable(to).transfer(address(this).balance);
             return;

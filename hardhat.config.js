@@ -7,60 +7,48 @@ require('hardhat-contract-sizer');
 require('solidity-docgen');
 const helpers = require('@nomicfoundation/hardhat-network-helpers');
 
+const INFURA_API_KEY = vars.get('INFURA_API_KEY');
+
 task('mine6', "Mine 6 blocks").setAction(() => helpers.mine(6));
 
-const accounts = process.env.PRIVATE_KEY ? [ process.env.PRIVATE_KEY ] : undefined;
+const accounts = vars.has('PRIVATE_KEY') ? [ vars.get('PRIVATE_KEY') ] : undefined;
 
 module.exports = {
   networks: {
     forked: {
       url: 'http://127.0.0.1:8545',
-      chainId: 0x7a69,
       accounts
     },
 
     optimisticEthereum: {
-      url: `https://optimism-mainnet.infura.io/v3/${process.env.INFURA_API_KEY}`,
-      chainId: 0x0a,
+      url: `https://optimism-mainnet.infura.io/v3/${INFURA_API_KEY}`,
       accounts
     },
 
     arbitrumOne: {
-      url: `https://arbitrum-mainnet.infura.io/v3/${process.env.INFURA_API_KEY}`,
-      chainId: 42161,
+      url: `https://arbitrum-mainnet.infura.io/v3/${INFURA_API_KEY}`,
       accounts
     },
 
     polygon: {
-      url: `https://polygon-mainnet.infura.io/v3/${process.env.INFURA_API_KEY}`,
-      chainId: 0x89,
+      url: `https://polygon-mainnet.infura.io/v3/${INFURA_API_KEY}`,
       accounts
     },
 
-    base: {
-      url: `https://base-mainnet.g.alchemy.com/v2/${process.env.ALCHEMY_KEY}`,
-      chainId: 0x2105,
+    sepolia: {
+      url: `https://sepolia.infura.io/v3/${INFURA_API_KEY}`,
       accounts
     }
   },
 
   etherscan: {
     apiKey: {
-      optimisticEthereum: process.env.ETHERSCAN_OPTIMISTIC_ETHEREUM,
-      arbitrumOne: process.env.ETHERSCAN_ARBITRUM_ONE,
-      polygon: process.env.ETHERSCAN_POLYGON,
-      base: process.env.ETHERSCAN_BASE
-    },
-    customChains: [
-      {
-        network: 'base',
-        chainId: 0x2105,
-        urls: {
-          apiURL: 'https://api.basescan.org/api',
-          browserURL: 'https://basescan.org'
-        }
-      }
-    ]
+      ethereum: vars.get('ETHERSCAN_ETHEREUM', null),
+      optimisticEthereum: vars.get('ETHERSCAN_OPTIMISTIC_ETHEREUM', null),
+      arbitrumOne: vars.get('ETHERSCAN_ARBITRUM_ONE', null),
+      polygon: vars.get('ETHERSCAN_POLYGON', null),
+      sepolia: vars.get('ETHERSCAN_ETHEREUM', null)
+    }
   },
 
   solidity: {

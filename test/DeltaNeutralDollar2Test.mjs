@@ -1,7 +1,8 @@
 import chai from 'chai';
-import withinPercent from '../utils/chai-percent.js';
 import { takeSnapshot, setBalance } from '@nomicfoundation/hardhat-network-helpers';
+import { deal } from 'hardhat-deal';
 import chalk from 'chalk';
+import withinPercent from '../utils/chai-percent.js';
 
 const ONE_ETHER = 1n * 10n ** 18n;
 chai.use(withinPercent);
@@ -21,16 +22,6 @@ const USDC_OPTIMISM = '0x7F5c764cBc14f9669B88837ca1490cCa17c31607';
 const USDCE_ARBITRUM = '0xFF970A61A04b1cA14834A43f5dE4533eBDDB5CC8';
 const USDC_POLYGON = '0x2791Bca1f2de4661ED88A30C99A7a9449Aa84174';
 const USDBC_BASE = '0xd9aAEc86B65D86f6A7B5B1b0c42FFA531710b6CA';
-
-const USDC_SPONSOR_OPTIMISM = '0xEbe80f029b1c02862B9E8a70a7e5317C06F62Cae';
-const USDC_SPONSOR_ARBITRUM = '0x5bdf85216ec1e38D6458C870992A69e38e03F7Ef';
-const USDC_SPONSOR_POLYGON = '0x0639556F03714A74a5fEEaF5736a4A64fF70D206';
-const USDBC_SPONSOR_BASE = '0x4c80E24119CFB836cdF0a6b53dc23F04F7e652CA';
-
-const WSTETH_SPONSOR_OPTIMISM = '0xc45A479877e1e9Dfe9FcD4056c699575a1045dAA';
-const WSTETH_SPONSOR_ARBITRUM = '0x513c7E3a9c69cA3e22550eF58AC1C0088e918FFf';
-const WSTETH_SPONSOR_POLYGON = '0xf59036caebea7dc4b86638dfa2e3c97da9fccd40';
-const CBETH_SPONSOR_BASE = '0x9c4ec768c28520B50860ea7a15bd7213a9fF58bf';
 
 const CHAIN_OPTIMISM = 'optimism';
 const CHAIN_ARBITRUM = 'arbitrum';
@@ -55,8 +46,7 @@ describe("DeltaNeutralDollar2", function() {
 
   let currentChain;
 
-  let usdcSponsorAddress, wstethSponsorAddress;
-  let myAccount, secondAccount, ownerAccount, swapEmulatorCustodian, liquidatorAccount, impersonatorUsdc, impersonatorWsteth;
+  let myAccount, secondAccount, ownerAccount, swapEmulatorCustodian, liquidatorAccount;
 
   let wstethAddress, usdcAddress;
   let usdc, wsteth;
@@ -85,8 +75,6 @@ describe("DeltaNeutralDollar2", function() {
       currentChain = CHAIN_OPTIMISM;
       wstethAddress = WSTETH_OPTIMISM;
       usdcAddress = USDC_OPTIMISM;
-      usdcSponsorAddress = USDC_SPONSOR_OPTIMISM;
-      wstethSponsorAddress = WSTETH_SPONSOR_OPTIMISM;
       aaveAddressesProvider = AAVE_ADDRESSES_PROVIDER_OPTIMISM_ARBITRUM_POLYGON;
       return;
     }
@@ -95,8 +83,6 @@ describe("DeltaNeutralDollar2", function() {
       currentChain = CHAIN_ARBITRUM;
       wstethAddress = WSTETH_ARBITRUM;
       usdcAddress = USDCE_ARBITRUM;
-      usdcSponsorAddress = USDC_SPONSOR_ARBITRUM;
-      wstethSponsorAddress = WSTETH_SPONSOR_ARBITRUM;
       aaveAddressesProvider = AAVE_ADDRESSES_PROVIDER_OPTIMISM_ARBITRUM_POLYGON;
       return;
     }
@@ -105,8 +91,6 @@ describe("DeltaNeutralDollar2", function() {
       currentChain = CHAIN_BASE;
       wstethAddress = CBETH_BASE;
       usdcAddress = USDBC_BASE;
-      usdcSponsorAddress = USDBC_SPONSOR_BASE;
-      wstethSponsorAddress = CBETH_SPONSOR_BASE;
       aaveAddressesProvider = AAVE_ADDRESSES_PROVIDER_BASE;
       return;
     }
@@ -114,8 +98,6 @@ describe("DeltaNeutralDollar2", function() {
     currentChain = CHAIN_POLYGON;
     wstethAddress = WSTETH_POLYGON;
     usdcAddress = USDC_POLYGON;
-    usdcSponsorAddress = USDC_SPONSOR_POLYGON;
-    wstethSponsorAddress = WSTETH_SPONSOR_POLYGON;
     aaveAddressesProvider = AAVE_ADDRESSES_PROVIDER_OPTIMISM_ARBITRUM_POLYGON;
   }
 
@@ -126,9 +108,6 @@ describe("DeltaNeutralDollar2", function() {
     initialSnapshot = await takeSnapshot();
 
     [ myAccount, secondAccount, ownerAccount, swapEmulatorCustodian, liquidatorAccount ] = await hre.ethers.getSigners();
-
-    impersonatorUsdc = await ethers.getImpersonatedSigner(usdcSponsorAddress);
-    await setBalance(impersonatorUsdc.address, ONE_ETHER);
 
     const addressProvider = await ethers.getContractAt('IPoolAddressesProvider', aaveAddressesProvider);
 
@@ -170,20 +149,17 @@ describe("DeltaNeutralDollar2", function() {
       console.log('eth price', formatBaseInUSDC(wstethPriceReal, usdcPrice), '->', formatBaseInUSDC(wstethPrice, usdcPrice));
     }
 
-    impersonatorWsteth = await ethers.getImpersonatedSigner(wstethSponsorAddress);
-    await setBalance(impersonatorWsteth.address, ONE_ETHER);
-
     let balancerVaultAddress = BALANCER_VAULT;
 
-    if (true) { // FIXME var?
+    if (false) { // FIXME var?
       const BalancerVaultEmulator = await ethers.getContractFactory('BalancerVaultEmulator');
       const balancerVaultEmulator = await BalancerVaultEmulator.deploy();
       await balancerVaultEmulator.waitForDeployment();
 
       balancerVaultAddress = await balancerVaultEmulator.getAddress();
 
-      await usdc.connect(impersonatorUsdc).transfer(await balancerVaultEmulator.getAddress(), 1_000_000n * 10n**6n);
-      await wsteth.connect(impersonatorWsteth).transfer(await balancerVaultEmulator.getAddress(), 100n * 10n**18n);
+      await deal(await usdc.getAddress(), await balancerVaultEmulator.getAddress(), 1_000_000n * 10n**6n);
+      await deal(await wsteth.getAddress(), await balancerVaultEmulator.getAddress(), 100n * 10n**18n);
     }
 
     const settings = {
@@ -221,7 +197,7 @@ describe("DeltaNeutralDollar2", function() {
     {
       await Promise.all([
         getWsteth(swapEmulatorCustodian, 10n * ONE_ETHER),
-        usdc.connect(impersonatorUsdc).transfer(await swapEmulatorCustodian.getAddress(), 10000n * 10n ** 6n),
+        getUsdc(swapEmulatorCustodian, 10000n * 10n ** 6n),
 
         wsteth.connect(swapEmulatorCustodian).approve(await swapHelper.getAddress(), 2n**256n-1n),
         usdc.connect(swapEmulatorCustodian).approve(await swapHelper.getAddress(), 2n**256n-1n)
@@ -259,8 +235,24 @@ describe("DeltaNeutralDollar2", function() {
     snapshot = await takeSnapshot();
   });
 
-  async function getWsteth(account, amount) {
-    return await wsteth.connect(impersonatorWsteth).transfer(account.address, amount);
+  async function getAddressOfTarget(target) {
+    if (target.address) {
+      return target.address;
+    }
+
+    if (target.getAddress) {
+      return await target.getAddress();
+    }
+
+    return target;
+  }
+
+  async function getWsteth(target, amount) {
+    await deal(wsteth.address, await getAddressOfTarget(target), amount);
+  }
+
+  async function getUsdc(target, amount) {
+    await deal(usdc.address, await getAddressOfTarget(target), amount);
   }
 
   function formatBaseInUSDC(v, usdcPrice) {
@@ -342,7 +334,7 @@ describe("DeltaNeutralDollar2", function() {
       return false;
     }
 
-    await usdc.connect(impersonatorUsdc).transfer(liquidatorAccount.address, 7000n * 10n ** 6n);
+    await getUsdc(liquidatorAccount, 7000n * 10n ** 6n);
 
     collateral ||= wsteth;
     debt ||= usdc;
@@ -600,7 +592,7 @@ describe("DeltaNeutralDollar2", function() {
   });
 
   it("caps are respected", async () => {
-    await wsteth.connect(impersonatorWsteth).transfer(myAccount.address, ONE_ETHER * 3n + 1n);
+    await getWsteth(myAccount, ONE_ETHER * 3n + 1n);
     await expect(deltaNeutralDollar.deposit(ONE_ETHER * 3n + 1n, myAccount.address)).to.be.revertedWith(ERROR_INCORRECT_DEPOSIT_OR_WITHDRAWAL_AMOUNT);
     await expect(deltaNeutralDollar.deposit(1n, myAccount.address)).to.be.revertedWith(ERROR_INCORRECT_DEPOSIT_OR_WITHDRAWAL_AMOUNT);
   });
@@ -742,7 +734,7 @@ describe("DeltaNeutralDollar2", function() {
 
   it("basic liquidation test, no contracts", async () => {
     await usdc.approve(await pool.getAddress(), 2n ** 256n - 1n);
-    await usdc.connect(impersonatorUsdc).transfer(myAccount.address, wstethPrice / 10n ** 2n * 2n); // usdc is 6 decimals, prices are 8 decimals
+    await getUsdc(myAccount, wstethPrice / 10n ** 2n * 2n); // usdc is 6 decimals, prices are 8 decimals
     await pool.supply(await usdc.getAddress(), wstethPrice / 10n ** 2n * 2n, myAccount.address, 0);
 
     const { availableBorrowsBase } = await pool.getUserAccountData(myAccount.address);

@@ -197,14 +197,17 @@ contract DeltaNeutralDollar2 is ERC20Upgradeable, OwnableUpgradeable, UUPSUpgrad
         _;
     }
 
+    function getTotalDebtMain() internal view returns (uint256) {
+        (, , address variableDebtTokenAddress) = IPoolDataProvider(aaveAddressProvider.getPoolDataProvider()).getReserveTokensAddresses(address(mainToken));
+        return IERC20(variableDebtTokenAddress).balanceOf(address(this));
+    }
+
     /// @notice Closes the entire position, repaying all debt, withdrawing all collateral from Aave and deactivating the contract.
     /// Only accessible by the contract owner when the position hasn't been already closed.
     function closePosition() public whenFlagNotSet(FLAGS_POSITION_CLOSED) onlyOwner {
         settings.flags = settings.flags | FLAGS_POSITION_CLOSED;
 
-        (, , address variableDebtTokenAddress) = IPoolDataProvider(aaveAddressProvider.getPoolDataProvider()).getReserveTokensAddresses(address(mainToken));
-
-        uint256 debtMain = IERC20(variableDebtTokenAddress).balanceOf(address(this));
+        uint256 debtMain = getTotalDebtMain();
         uint256 balanceMain = mainToken.balanceOf(address(this));
 
         if (balanceMain >= debtMain) { // even if debtMain and/or balanceMain == 0

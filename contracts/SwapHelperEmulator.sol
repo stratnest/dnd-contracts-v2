@@ -7,12 +7,10 @@ import { IAaveOracle } from "@aave/core-v3/contracts/interfaces/IAaveOracle.sol"
 import "./ISwapHelper.sol";
 
 contract SwapHelperEmulator is ISwapHelper {
-    address private custodian;
     address private wstethToken;
     address private aaveOracle;
 
-    constructor(address _custodian, address _ethToken, address _aaveOracle) {
-        custodian = _custodian;
+    constructor(address _ethToken, address _aaveOracle) {
         wstethToken = _ethToken;
         aaveOracle = _aaveOracle;
     }
@@ -32,25 +30,22 @@ contract SwapHelperEmulator is ISwapHelper {
         if (to == wstethToken) {
             uint256 stablePrice = IAaveOracle(aaveOracle).getAssetPrice(from);
             uint256 amountEth = stableToEth(amount, stablePrice, wstethPrice) / 1000 * 995; // 0.5%
-            releaseFundsFromCustodian(msg.sender, wstethToken, amountEth);
-            IERC20(from).transfer(custodian, amount);
+            releaseFunds(msg.sender, wstethToken, amountEth);
             return amountEth;
 
         } else if (from == wstethToken) {
             uint256 stablePrice = IAaveOracle(aaveOracle).getAssetPrice(to);
             uint256 amountStable = ethToStable(amount, wstethPrice, stablePrice) / 1000 * 995; // 0.5%
-            releaseFundsFromCustodian(msg.sender, to, amountStable);
-            IERC20(wstethToken).transfer(custodian, amount);
+            releaseFunds(msg.sender, to, amountStable);
             return amountStable;
         }
 
         revert("WTF");
     }
 
-    function releaseFundsFromCustodian(address recipient, address token, uint256 amount) internal {
-        require(IERC20(token).allowance(custodian, address(this)) >= amount, "Allowance not set on custodian");
-        require(IERC20(token).balanceOf(custodian) >= amount, "Insufficient balance on custodian");
-        IERC20(token).transferFrom(custodian, recipient, amount);
+    function releaseFunds(address recipient, address token, uint256 amount) internal {
+        require(IERC20(token).balanceOf(address(this)) >= amount, "Insufficient balance on swapEmulator");
+        IERC20(token).transfer(recipient, amount);
     }
 
     function calcSwapFee(address from, address to, uint256 amount)

@@ -4,8 +4,8 @@ import { deal } from 'hardhat-deal';
 import chalk from 'chalk';
 import withinPercent from '../utils/chai-percent.js';
 
-const MOCK_AAVE = true;
-const MOCK_BALANCER = true;
+const MOCK_AAVE = false;
+const MOCK_BALANCER = false;
 
 const ONE_ETHER = 1n * 10n ** 18n;
 chai.use(withinPercent);
@@ -49,7 +49,7 @@ describe("DeltaNeutralDollar2", function() {
 
   let currentChain;
 
-  let myAccount, secondAccount, ownerAccount, swapEmulatorCustodian, liquidatorAccount;
+  let myAccount, secondAccount, ownerAccount, liquidatorAccount;
 
   let wstethAddress, usdcAddress;
   let usdc, wsteth;
@@ -109,7 +109,7 @@ describe("DeltaNeutralDollar2", function() {
 
     initialSnapshot = await takeSnapshot();
 
-    [ myAccount, secondAccount, ownerAccount, swapEmulatorCustodian, liquidatorAccount ] = await hre.ethers.getSigners();
+    [ myAccount, secondAccount, ownerAccount, liquidatorAccount ] = await hre.ethers.getSigners();
 
     const DeltaNeutralDollar = await ethers.getContractFactory('DeltaNeutralDollar2');
     deltaNeutralDollar = await DeltaNeutralDollar.deploy();
@@ -173,8 +173,13 @@ describe("DeltaNeutralDollar2", function() {
     usdcPrice = await aaveOracle.getAssetPrice(await usdc.getAddress());
 
     const SwapHelper = await ethers.getContractFactory('SwapHelperEmulator');
-    swapHelper = await SwapHelper.deploy(swapEmulatorCustodian.address, wstethAddress, await aaveOracle.getAddress()),
+    swapHelper = await SwapHelper.deploy(wstethAddress, await aaveOracle.getAddress()),
     await swapHelper.waitForDeployment();
+
+    await Promise.all([
+      getWsteth(swapHelper, 10n * ONE_ETHER),
+      getUsdc(swapHelper, 10000n * 10n ** 6n),
+    ]);
 
     let balancerVaultAddress = BALANCER_VAULT;
 
@@ -217,17 +222,6 @@ describe("DeltaNeutralDollar2", function() {
       wsteth.approve(await deltaNeutralDollar.getAddress(), 2n ** 256n - 1n),
       getWsteth(myAccount, ONE_ETHER * 2n)
     ]);
-
-    // prepare swapEmulator custodian
-    {
-      await Promise.all([
-        getWsteth(swapEmulatorCustodian, 10n * ONE_ETHER),
-        getUsdc(swapEmulatorCustodian, 10000n * 10n ** 6n),
-
-        wsteth.connect(swapEmulatorCustodian).approve(await swapHelper.getAddress(), 2n**256n-1n),
-        usdc.connect(swapEmulatorCustodian).approve(await swapHelper.getAddress(), 2n**256n-1n)
-      ]);
-    }
 
     // prepare liquidatorAccount
     {
@@ -387,7 +381,7 @@ describe("DeltaNeutralDollar2", function() {
     return true;
   }
 
-  it.only("open position in wsteth", async () => {
+  it("open position in wsteth", async () => {
     await deltaNeutralDollar.deposit(ONE_ETHER, myAccount.address);
 
     expect(await deltaNeutralDollar.balanceOf(myAccount.address)).to.be.withinPercent(wstethPrice, 1);
@@ -577,7 +571,7 @@ describe("DeltaNeutralDollar2", function() {
     await deltaNeutralDollar.transfer(secondAccount.address, await deltaNeutralDollar.balanceOf(myAccount.address));
 
     // burn to zero
-    await wsteth.connect(secondAccount).transfer(swapEmulatorCustodian.address, await wsteth.balanceOf(secondAccount.address));
+    await wsteth.connect(secondAccount).transfer(await swapHelper.getAddress(), await wsteth.balanceOf(secondAccount.address));
 
     const secondBalanceBefore = await deltaNeutralDollar.balanceOf(secondAccount.address);
     expect(secondBalanceBefore).to.be.withinPercent(wstethPrice, 1.1);

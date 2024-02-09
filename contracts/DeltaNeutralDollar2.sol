@@ -16,6 +16,7 @@ import { IPoolDataProvider } from "@aave/core-v3/contracts/interfaces/IPoolDataP
 import { DataTypes } from "@aave/core-v3/contracts/protocol/libraries/types/DataTypes.sol";
 
 import { ISwapHelper } from "./ISwapHelper.sol";
+import { IVaultForDND } from "./interfaces/balancer/IVaultForDND.sol";
 
 import "hardhat/console.sol";
 
@@ -42,15 +43,6 @@ string constant ERROR_CONTRACT_NOT_READY_FOR_WITHDRAWAL = "DND-06";
 string constant ERROR_POSITION_CLOSED = "DND-07";
 string constant ERROR_POSITION_UNCHANGED = "DND-08";
 string constant ERROR_IMPOSSIBLE_MODE = "DND-09";
-
-interface BalancerVaultForDeltaNeutralDollar {
-    function flashLoan(
-        address recipient,
-        IERC20[] calldata tokens,
-        uint256[] calldata amounts,
-        bytes calldata userData
-    ) external;
-}
 
 /// @title Delta-neutral dollar vault
 
@@ -658,7 +650,7 @@ contract DeltaNeutralDollar2 is ERC20Upgradeable, OwnableUpgradeable, UUPSUpgrad
         uint256[] memory amounts = new uint256[](1);
         amounts[0] = amount;
 
-        BalancerVaultForDeltaNeutralDollar(balancerVault).flashLoan(address(this), tokens, amounts, userData);
+        IVaultForDND(balancerVault).flashLoan(address(this), tokens, amounts, userData);
     }
 
     function convertBaseToStable(uint256 amount, uint256 stablePrice) internal view returns (uint256) {

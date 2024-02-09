@@ -15,6 +15,8 @@ import { IPoolAddressesProvider } from "@aave/core-v3/contracts/interfaces/IPool
 import { IPoolDataProvider } from "@aave/core-v3/contracts/interfaces/IPoolDataProvider.sol";
 import { DataTypes } from "@aave/core-v3/contracts/protocol/libraries/types/DataTypes.sol";
 
+import { PoolEmulator } from "./AaveEmulator/PoolEmulator.sol";
+
 import { ISwapHelper } from "./ISwapHelper.sol";
 import { IVaultForDND } from "./interfaces/balancer/IVaultForDND.sol";
 
@@ -175,7 +177,7 @@ contract DeltaNeutralDollar2 is ERC20Upgradeable, OwnableUpgradeable, UUPSUpgrad
         _transferOwnership(msg.sender);
     }
 
-    // FIXME move to custom errors
+    // FIXME move to custom errors?
 
     function _authorizeUpgrade(address) internal override onlyOwner {}
 
@@ -196,9 +198,15 @@ contract DeltaNeutralDollar2 is ERC20Upgradeable, OwnableUpgradeable, UUPSUpgrad
         _;
     }
 
+    // this is production version
+    // function getTotalDebtMain() internal view returns (uint256) {
+    //     (, , address variableDebtTokenAddress) = IPoolDataProvider(aaveAddressProvider.getPoolDataProvider()).getReserveTokensAddresses(address(mainToken));
+    //     return IERC20(variableDebtTokenAddress).balanceOf(address(this));
+    // }
+
+    // this is aave emulator
     function getTotalDebtMain() internal view returns (uint256) {
-        (, , address variableDebtTokenAddress) = IPoolDataProvider(aaveAddressProvider.getPoolDataProvider()).getReserveTokensAddresses(address(mainToken));
-        return IERC20(variableDebtTokenAddress).balanceOf(address(this));
+        return PoolEmulator(address(pool)).debtBalanceOf(address(this));
     }
 
     /// @notice Closes the entire position, repaying all debt, withdrawing all collateral from Aave and deactivating the contract.

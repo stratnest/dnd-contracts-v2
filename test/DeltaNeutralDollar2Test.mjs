@@ -173,7 +173,7 @@ describe("DeltaNeutralDollar2", function() {
 
     let balancerVaultAddress = BALANCER_VAULT;
 
-    if (false) { // FIXME var?
+    if (true) { // FIXME var?
       const BalancerVaultEmulator = await ethers.getContractFactory('BalancerVaultEmulator');
       const balancerVaultEmulator = await BalancerVaultEmulator.deploy();
       await balancerVaultEmulator.waitForDeployment();

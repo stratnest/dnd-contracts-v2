@@ -153,7 +153,7 @@ contract DeltaNeutralDollar2 is ERC20Upgradeable, OwnableUpgradeable, UUPSUpgrad
 
         aaveAddressProvider = IPoolAddressesProvider(_aaveAddressProvider);
 
-        pool = IPool(aaveAddressProvider.getPool());
+        pool = IPool(aaveAddressProvider.getPool()); // FIXME change back to calls, because what are we trying to save here really
         oracle = IAaveOracle(aaveAddressProvider.getPriceOracle());
 
         settings = _settings;

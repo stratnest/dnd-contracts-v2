@@ -222,6 +222,7 @@ describe("DeltaNeutralDollar2", function() {
     };
 
     await deltaNeutralDollar.initialize(
+      currentChain == CHAIN_LOCAL,
       8,
       "DND",
       "Delta Neutral Dividend",

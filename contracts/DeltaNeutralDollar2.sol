@@ -96,6 +96,7 @@ contract DeltaNeutralDollar2 is ERC20Upgradeable, OwnableUpgradeable, UUPSUpgrad
 
     uint8 private stableTokenDecimals;
     uint8 private mainTokenDecimals;
+    bool private isMock;
     // 8 bits left here
 
     /// @notice Event triggered post-execution of position change by deposit, withdrawal or direct execution of the `rebalance()` function.
@@ -136,6 +137,7 @@ contract DeltaNeutralDollar2 is ERC20Upgradeable, OwnableUpgradeable, UUPSUpgrad
     /// @param _aaveAddressProvider The address of the Aave's ADDRESS_PROVIDER.
     /// @param _settings Actual settings. See `Settings` structure in code.
     function initialize(
+        bool _isMock,
         uint8 __decimals,
         string memory symbol,
         string memory name,
@@ -150,6 +152,8 @@ contract DeltaNeutralDollar2 is ERC20Upgradeable, OwnableUpgradeable, UUPSUpgrad
     {
         __ERC20_init(name, symbol);
         // __Ownable_init(); // FIXME why not needed?
+
+        isMock = _isMock;
 
         _decimals = __decimals;
 
@@ -199,14 +203,13 @@ contract DeltaNeutralDollar2 is ERC20Upgradeable, OwnableUpgradeable, UUPSUpgrad
     }
 
     // this is production version
-    // function getTotalDebtMain() internal view returns (uint256) {
-    //     (, , address variableDebtTokenAddress) = IPoolDataProvider(aaveAddressProvider.getPoolDataProvider()).getReserveTokensAddresses(address(mainToken));
-    //     return IERC20(variableDebtTokenAddress).balanceOf(address(this));
-    // }
-
-    // this is aave emulator
     function getTotalDebtMain() internal view returns (uint256) {
-        return PoolEmulator(address(pool)).debtBalanceOf(address(this));
+        if (isMock) {
+            return PoolEmulator(address(pool)).debtBalanceOf(address(this));
+        }
+
+        (, , address variableDebtTokenAddress) = IPoolDataProvider(aaveAddressProvider.getPoolDataProvider()).getReserveTokensAddresses(address(mainToken));
+        return IERC20(variableDebtTokenAddress).balanceOf(address(this));
     }
 
     /// @notice Closes the entire position, repaying all debt, withdrawing all collateral from Aave and deactivating the contract.

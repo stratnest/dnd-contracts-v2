@@ -149,8 +149,10 @@ describe("DeltaNeutralDollar2", function() {
     ]);
 
     usdc = await ethers.getContractAt('IERC20Metadata', usdcAddress);
+    usdc.address = await usdc.getAddress();
 
     wsteth = await ethers.getContractAt('IERC20Metadata', wstethAddress);
+    wsteth.address = await wsteth.getAddress();
 
     // prepare mock oracle
     {

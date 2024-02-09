@@ -488,7 +488,7 @@ describe("DeltaNeutralDollar2", function() {
 
     await deltaNeutralDollar.rebalance();
 
-    await getWsteth(myAccount, ONE_ETHER * 1n);
+    await getWsteth(myAccount, ONE_ETHER * 3n);
 
     await deltaNeutralDollar.deposit(ONE_ETHER * 2n, myAccount.address);
 

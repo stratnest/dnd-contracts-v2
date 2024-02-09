@@ -20,8 +20,8 @@ uint256 constant LIQUIDATION_THRESHOLD = 8200;
 contract PoolEmulator {
   address public immutable ADDRESSES_PROVIDER;
 
-  mapping (address customer => uint256 amount) private depositBalanceOf;
-  mapping (address customer => uint256 amount) private debtBalanceOf;
+  mapping (address customer => uint256 amount) public depositBalanceOf;
+  mapping (address customer => uint256 amount) public debtBalanceOf;
 
   address private supplyAsset;
   address private borrowAsset;

@@ -2,26 +2,20 @@
 pragma solidity ^0.8.0;
 
 import { IERC20 } from "@openzeppelin/contracts/interfaces/IERC20.sol";
-
 import { IAaveOracle } from "@aave/core-v3/contracts/interfaces/IAaveOracle.sol";
-import { IPoolAddressesProvider } from "@aave/core-v3/contracts/interfaces/IPoolAddressesProvider.sol";
 
 import "./ISwapHelper.sol";
 
 contract SwapHelperEmulator is ISwapHelper {
     address private custodian;
     address private wstethToken;
-    address private addressesProvider;
+    address private aaveOracle;
 
     // FIXME use this balance instead of custodian
-    constructor(address _custodian, address _ethToken, address _addressesProvider) {
+    constructor(address _custodian, address _ethToken, address _aaveOracle) {
         custodian = _custodian;
         wstethToken = _ethToken;
-        addressesProvider = _addressesProvider;
-    }
-
-    function oracle() internal view returns (IAaveOracle) {
-        return IAaveOracle(IPoolAddressesProvider(addressesProvider).getPriceOracle());
+        aaveOracle = _aaveOracle;
     }
 
     function swap(address from, address to, uint256 amount)
@@ -29,26 +23,35 @@ contract SwapHelperEmulator is ISwapHelper {
         override
         returns (uint256)
     {
+        require(IERC20(from).allowance(msg.sender, address(this)) >= amount, "Allowance not set");
+        require(IERC20(from).balanceOf(msg.sender) >= amount, "Insufficient balance");
+
         IERC20(from).transferFrom(msg.sender, address(this), amount);
 
-        uint256 wstethPrice = oracle().getAssetPrice(address(wstethToken));
+        uint256 wstethPrice = IAaveOracle(aaveOracle).getAssetPrice(address(wstethToken));
 
         if (to == wstethToken) {
-            uint256 stablePrice = oracle().getAssetPrice(from);
+            uint256 stablePrice = IAaveOracle(aaveOracle).getAssetPrice(from);
             uint256 amountEth = stableToEth(amount, stablePrice, wstethPrice) / 1000 * 995; // 0.5%
-            IERC20(wstethToken).transferFrom(custodian, msg.sender, amountEth);
+            releaseFundsFromCustodian(msg.sender, wstethToken, amountEth);
             IERC20(from).transfer(custodian, amount);
             return amountEth;
 
         } else if (from == wstethToken) {
-            uint256 stablePrice = oracle().getAssetPrice(to);
+            uint256 stablePrice = IAaveOracle(aaveOracle).getAssetPrice(to);
             uint256 amountStable = ethToStable(amount, wstethPrice, stablePrice) / 1000 * 995; // 0.5%
-            IERC20(to).transferFrom(custodian, msg.sender, amountStable);
+            releaseFundsFromCustodian(msg.sender, to, amountStable);
             IERC20(wstethToken).transfer(custodian, amount);
             return amountStable;
         }
 
         revert("WTF");
+    }
+
+    function releaseFundsFromCustodian(address recipient, address token, uint256 amount) internal {
+        require(IERC20(token).allowance(custodian, address(this)) >= amount, "Allowance not set on custodian");
+        require(IERC20(token).balanceOf(custodian) >= amount, "Insufficient balance on custodian");
+        IERC20(token).transferFrom(custodian, recipient, amount);
     }
 
     function calcSwapFee(address from, address to, uint256 amount)

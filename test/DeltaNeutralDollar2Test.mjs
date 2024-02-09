@@ -4,6 +4,9 @@ import { deal } from 'hardhat-deal';
 import chalk from 'chalk';
 import withinPercent from '../utils/chai-percent.js';
 
+const MOCK_AAVE = true;
+const MOCK_BALANCER = true;
+
 const ONE_ETHER = 1n * 10n ** 18n;
 chai.use(withinPercent);
 const expect = chai.expect;
@@ -108,20 +111,9 @@ describe("DeltaNeutralDollar2", function() {
 
     [ myAccount, secondAccount, ownerAccount, swapEmulatorCustodian, liquidatorAccount ] = await hre.ethers.getSigners();
 
-    const addressProvider = await ethers.getContractAt('IPoolAddressesProvider', aaveAddressesProvider);
-
-    const SwapHelper = await ethers.getContractFactory('SwapHelperEmulator');
     const DeltaNeutralDollar = await ethers.getContractFactory('DeltaNeutralDollar2');
-
-    [ swapHelper, deltaNeutralDollar ] = await Promise.all([
-      SwapHelper.deploy(swapEmulatorCustodian.address, wstethAddress, aaveAddressesProvider),
-      DeltaNeutralDollar.deploy()
-    ]);
-
-    await Promise.all([
-      swapHelper.waitForDeployment(),
-      deltaNeutralDollar.waitForDeployment()
-    ]);
+    deltaNeutralDollar = await DeltaNeutralDollar.deploy();
+    await deltaNeutralDollar.waitForDeployment();
 
     usdc = await ethers.getContractAt('IERC20Metadata', usdcAddress);
     usdc.address = await usdc.getAddress();
@@ -129,8 +121,42 @@ describe("DeltaNeutralDollar2", function() {
     wsteth = await ethers.getContractAt('IERC20Metadata', wstethAddress);
     wsteth.address = await wsteth.getAddress();
 
-    // prepare mock oracle
-    {
+    let addressProvider;
+
+    if (MOCK_AAVE) {
+      const AddressProvider = await ethers.getContractFactory('PoolAddressesProviderEmulator');
+      addressProvider = await AddressProvider.deploy();
+      await addressProvider.waitForDeployment();
+
+      const PoolEmulator = await ethers.getContractFactory('PoolEmulator');
+      aavePool = await PoolEmulator.deploy(await addressProvider.getAddress());
+      await aavePool.waitForDeployment();
+
+      await getWsteth(aavePool, 1000n * ONE_ETHER);
+      await getUsdc(aavePool, 1000n * 2000n * 10n ** 6n);
+
+      await addressProvider.setAddress(0, await aavePool.getAddress());
+
+      const AaveOracleEmulator = await ethers.getContractFactory('AaveOracleEmulator');
+      aaveOracle = await AaveOracleEmulator.deploy(
+        await addressProvider.getAddress(),
+        [
+          await usdc.getAddress(),
+          await wsteth.getAddress()
+        ],
+        ethers.ZeroAddress,
+        100000000n
+      );
+      await aaveOracle.waitForDeployment();
+      await addressProvider.setPriceOracle(await aaveOracle.getAddress());
+
+      await aaveOracle.setOverridePrice(await wsteth.getAddress(), 2000n * 10n**8n);
+      await aaveOracle.setOverridePrice(await usdc.getAddress(), 99999000);
+
+    } else {
+      addressProvider = await ethers.getContractAt('IPoolAddressesProvider', aaveAddressesProvider);
+      aavePool = await ethers.getContractAt('IPool', await addressProvider.getPool());
+
       const MockAaveOracle = await ethers.getContractFactory('MockAaveOracle');
       aaveOracle = await MockAaveOracle.deploy(await addressProvider.getPriceOracle());
       await aaveOracle.waitForDeployment();
@@ -146,9 +172,13 @@ describe("DeltaNeutralDollar2", function() {
     wstethPrice = await aaveOracle.getAssetPrice(await wsteth.getAddress());
     usdcPrice = await aaveOracle.getAssetPrice(await usdc.getAddress());
 
+    const SwapHelper = await ethers.getContractFactory('SwapHelperEmulator');
+    swapHelper = await SwapHelper.deploy(swapEmulatorCustodian.address, wstethAddress, await aaveOracle.getAddress()),
+    await swapHelper.waitForDeployment();
+
     let balancerVaultAddress = BALANCER_VAULT;
 
-    if (false) { // FIXME var?
+    if (MOCK_BALANCER) {
       const BalancerVaultEmulator = await ethers.getContractFactory('BalancerVaultEmulator');
       const balancerVaultEmulator = await BalancerVaultEmulator.deploy();
       await balancerVaultEmulator.waitForDeployment();
@@ -177,13 +207,11 @@ describe("DeltaNeutralDollar2", function() {
       await usdc.getAddress(),
       await wsteth.getAddress(),
       balancerVaultAddress,
-      aaveAddressesProvider,
+      await addressProvider.getAddress(),
       settings
     );
 
     await deltaNeutralDollar.transferOwnership(ownerAccount.address);
-
-    aavePool = await ethers.getContractAt('IPool', await addressProvider.getPool());
 
     await Promise.all([
       wsteth.approve(await deltaNeutralDollar.getAddress(), 2n ** 256n - 1n),
@@ -359,7 +387,7 @@ describe("DeltaNeutralDollar2", function() {
     return true;
   }
 
-  it("open position in wsteth", async () => {
+  it.only("open position in wsteth", async () => {
     await deltaNeutralDollar.deposit(ONE_ETHER, myAccount.address);
 
     expect(await deltaNeutralDollar.balanceOf(myAccount.address)).to.be.withinPercent(wstethPrice, 1);

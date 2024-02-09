@@ -165,7 +165,6 @@ contract DeltaNeutralDollar2 is ERC20Upgradeable, OwnableUpgradeable, UUPSUpgrad
 
         stableToken.approve(settings.swapHelper, 2 ** 256 - 1);
         mainToken.approve(settings.swapHelper, 2 ** 256 - 1);
-        console.log("Approved swap helper");
 
         mainTokenDecimals = IERC20Metadata(_mainToken).decimals();
         stableTokenDecimals = IERC20Metadata(_stableToken).decimals();
@@ -388,10 +387,6 @@ contract DeltaNeutralDollar2 is ERC20Upgradeable, OwnableUpgradeable, UUPSUpgrad
     }
 
     function implementSupplyThenBorrow(uint256 supplyCollateralBase, uint256 borrowDebtBase, uint256 mainPrice) internal {
-        console.log("Supply collateral", supplyCollateralBase);
-        console.log("      Borrow debt", borrowDebtBase);
-        console.log("       Main price", mainPrice);
-
         uint256 supplyCollateralMain = convertBaseToMain(supplyCollateralBase, mainPrice);
 
         uint256 collateralMain = supplyCollateralMain / 5;
@@ -399,9 +394,6 @@ contract DeltaNeutralDollar2 is ERC20Upgradeable, OwnableUpgradeable, UUPSUpgrad
         // this actually cannot happen, because base currency in aave is 8 decimals and ether is 18, so smallest
         // aave amount is divisable by 5. But we keep this sanity check anyway.
         assert(collateralMain > 0);
-
-        console.log("MainToken balance", mainToken.balanceOf(address(this)));
-        console.log("Allowance", mainToken.allowance(address(this), address(settings.swapHelper)));
 
         uint256 collateralStable = swap(mainToken, stableToken, collateralMain);
         assert(collateralStable > 0);
@@ -434,23 +426,13 @@ contract DeltaNeutralDollar2 is ERC20Upgradeable, OwnableUpgradeable, UUPSUpgrad
         uint256 mainPrice = oracle.getAssetPrice(address(mainToken));
         uint256 stablePrice = oracle.getAssetPrice(address(stableToken));
 
-
         uint256 mainToSwap = convertBaseToMain(convertStableToBase(flashLoanStable, stablePrice), mainPrice);
-
-        console.log("flash loan stable", flashLoanStable);
-        console.log("mainToSwap", mainToSwap);
 
         uint256 feeMain = ISwapHelper(settings.swapHelper).calcSwapFee(address(mainToken), address(stableToken), mainToSwap);
         mainToSwap = mainToSwap + feeMain;
 
-        console.log("mainToSwap", mainToSwap);
-
-        console.log("stableToken before", stableToken.balanceOf(address(this)));
-
         // at this point we assume we always have enough main token to cover swap fees
         swap(mainToken, stableToken, mainToSwap);
-
-        console.log("stableToken after ", stableToken.balanceOf(address(this)));
 
         assert(stableToken.balanceOf(address(this)) >= flashLoanStable);
 
@@ -634,7 +616,6 @@ contract DeltaNeutralDollar2 is ERC20Upgradeable, OwnableUpgradeable, UUPSUpgrad
     function collateralSupply(uint256 amount) internal {
         pool.supply(address(stableToken), amount, address(this), 0);
         pool.setUserUseReserveAsCollateral(address(stableToken), true);
-
         stableToken.transfer(address(pool), 0);
     }
 

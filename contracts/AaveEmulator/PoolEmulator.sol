@@ -96,14 +96,14 @@ contract PoolEmulator {
     address onBehalfOf
   ) public returns (uint256) {
     uint256 amountToRepay = amount == type(uint256).max ? debtBalanceOf[onBehalfOf] : amount;
-    require(amount > 0, "zero");
+    require(amountToRepay > 0, "zero");
 
-    require(IERC20(asset).allowance(msg.sender, address(this)) >= amount, "Allowance not set");
-    require(IERC20(asset).balanceOf(msg.sender) >= amount, "Insufficient balance");
+    require(IERC20(asset).allowance(msg.sender, address(this)) >= amountToRepay, "Allowance not set");
+    require(IERC20(asset).balanceOf(msg.sender) >= amountToRepay, "Insufficient balance");
 
     require(borrowAsset == asset, "Only one asset is supported");
 
-    IERC20(asset).transferFrom(msg.sender, address(this), amount);
+    IERC20(asset).transferFrom(msg.sender, address(this), amountToRepay);
     debtBalanceOf[onBehalfOf] -= amountToRepay;
 
     return amountToRepay;

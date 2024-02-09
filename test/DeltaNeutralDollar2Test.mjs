@@ -4,9 +4,6 @@ import { deal } from 'hardhat-deal';
 import chalk from 'chalk';
 import withinPercent from '../utils/chai-percent.js';
 
-const MOCK_AAVE = true;
-const MOCK_BALANCER = true;
-
 const ONE_ETHER = 1n * 10n ** 18n;
 
 chai.use(withinPercent);
@@ -124,7 +121,7 @@ describe("DeltaNeutralDollar2", function() {
 
     let addressProvider;
 
-    if (MOCK_AAVE) {
+    if (currentChain == CHAIN_LOCAL) {
       const TestToken = await ethers.getContractFactory('TestToken');
 
       stableToken = await TestToken.deploy('STABLE', 6);
@@ -200,7 +197,7 @@ describe("DeltaNeutralDollar2", function() {
 
     let balancerVaultAddress = BALANCER_VAULT;
 
-    if (MOCK_BALANCER) {
+    if (currentChain == CHAIN_LOCAL) {
       const BalancerVaultEmulator = await ethers.getContractFactory('BalancerVaultEmulator');
       const balancerVaultEmulator = await BalancerVaultEmulator.deploy();
       await balancerVaultEmulator.waitForDeployment();
@@ -310,7 +307,7 @@ describe("DeltaNeutralDollar2", function() {
   }
 
   async function log(title, originalWstethPrice, address) {
-    if (!MOCK_AAVE && !usdcAToken) {
+    if (currentChain !== CHAIN_LOCAL && !usdcAToken) {
       await loadAaveTokensForDisplay();
     }
 
@@ -770,7 +767,7 @@ describe("DeltaNeutralDollar2", function() {
     expect(diff.toObject()).to.deep.equal({ collateralChangeBase: 0n, debtChangeBase: 0n });
   });
 
-  if (!MOCK_AAVE) {
+  if (currentChain !== CHAIN_LOCAL) {
     it("basic liquidation test, no contracts", async () => {
       await stableToken.approve(await aavePool.getAddress(), 2n ** 256n - 1n);
       await getStableToken(myAccount, mainTokenPrice / 10n ** 2n * 2n); // usdc is 6 decimals, prices are 8 decimals

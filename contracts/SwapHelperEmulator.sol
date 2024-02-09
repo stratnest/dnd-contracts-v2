@@ -11,7 +11,6 @@ contract SwapHelperEmulator is ISwapHelper {
     address private wstethToken;
     address private aaveOracle;
 
-    // FIXME use this balance instead of custodian
     constructor(address _custodian, address _ethToken, address _aaveOracle) {
         custodian = _custodian;
         wstethToken = _ethToken;

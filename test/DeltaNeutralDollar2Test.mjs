@@ -168,6 +168,22 @@ describe("DeltaNeutralDollar2", function() {
       console.log('eth price', formatBaseInUSDC(wstethPriceReal, usdcPrice), '->', formatBaseInUSDC(wstethPrice, usdcPrice));
     }
 
+    impersonatorWsteth = await ethers.getImpersonatedSigner(wstethSponsorAddress);
+    await setBalance(impersonatorWsteth.address, ONE_ETHER);
+
+    let balancerVaultAddress = BALANCER_VAULT;
+
+    if (false) { // FIXME var?
+      const BalancerVaultEmulator = await ethers.getContractFactory('BalancerVaultEmulator');
+      const balancerVaultEmulator = await BalancerVaultEmulator.deploy();
+      await balancerVaultEmulator.waitForDeployment();
+
+      balancerVaultAddress = await balancerVaultEmulator.getAddress();
+
+      await usdc.connect(impersonatorUsdc).transfer(await balancerVaultEmulator.getAddress(), 1_000_000n * 10n**6n);
+      await wsteth.connect(impersonatorWsteth).transfer(await balancerVaultEmulator.getAddress(), 100n * 10n**18n);
+    }
+
     const settings = {
       swapHelper: await swapHelper.getAddress(),
 
@@ -185,16 +201,12 @@ describe("DeltaNeutralDollar2", function() {
       "Delta Neutral Dividend",
       await usdc.getAddress(),
       await wsteth.getAddress(),
-      BALANCER_VAULT,
+      balancerVaultAddress,
       aaveAddressesProvider,
       settings
     );
 
     await deltaNeutralDollar.transferOwnership(ownerAccount.address);
-
-    impersonatorWsteth = await ethers.getImpersonatedSigner(wstethSponsorAddress);
-
-    await setBalance(impersonatorWsteth.address, ONE_ETHER);
 
     pool = await ethers.getContractAt('IPool', await addressProvider.getPool());
 

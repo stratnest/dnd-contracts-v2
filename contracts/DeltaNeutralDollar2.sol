@@ -529,9 +529,8 @@ contract DeltaNeutralDollar2 is ERC20Upgradeable, OwnableUpgradeable, UUPSUpgrad
     }
 
     /// @notice Deposit funds into vault
-    /// @param amount amount of `token` to deposit
-    /// @param onBehalfOf who to mint DND tokens to
-    function deposit(uint256 amount, address onBehalfOf)
+    /// @param amount amount of `mainToken` to deposit
+    function deposit(uint256 amount)
         public
         whenFlagNotSet(FLAGS_DEPOSIT_PAUSED)
         whenFlagNotSet(FLAGS_POSITION_CLOSED)
@@ -552,8 +551,8 @@ contract DeltaNeutralDollar2 is ERC20Upgradeable, OwnableUpgradeable, UUPSUpgrad
         uint256 totalBalanceBaseAfter = totalBalanceBase();
 
         if (totalSupply() == 0) {
-            _mint(onBehalfOf, totalBalanceBaseAfter);
-            emit PositionDeposit(amount, totalBalanceBaseAfter, onBehalfOf);
+            _mint(msg.sender, totalBalanceBaseAfter);
+            emit PositionDeposit(amount, totalBalanceBaseAfter, msg.sender);
             return;
         }
 
@@ -562,9 +561,9 @@ contract DeltaNeutralDollar2 is ERC20Upgradeable, OwnableUpgradeable, UUPSUpgrad
         uint256 minted = Math.mulDiv(totalSupply(), totalBalanceAddedPercent, 10e18);
         assert(minted > 0);
 
-        _mint(onBehalfOf, minted);
+        _mint(msg.sender, minted);
 
-        emit PositionDeposit(amount, totalBalanceBaseAfter - totalBalanceBaseBefore, onBehalfOf);
+        emit PositionDeposit(amount, totalBalanceBaseAfter - totalBalanceBaseBefore, msg.sender);
     }
 
     function _calculateMainWithdrawAmount(uint256 amount) internal view returns (uint256 amountMain, uint256 amountBase) {

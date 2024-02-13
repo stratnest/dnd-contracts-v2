@@ -49,35 +49,29 @@ string constant ERROR_IMPOSSIBLE_MODE = "DND-09";
 /// @title Delta-neutral dollar vault
 
 contract DeltaNeutralDollar2 is ERC20Upgradeable, OwnableUpgradeable, UUPSUpgradeable {
-    /// @notice Settings are documented in the code
-    struct Settings {
-        /// @notice Address of the contract that implements asset swapping functionality.
-        address swapHelper;
+    /// @notice Address of the contract that implements asset swapping functionality.
+    address public swapHelper;
 
-        /// @notice The minimum amount of `mainToken` to deposit.
-        uint256 minDepositAmount;
+    /// @notice The minimum amount of `mainToken` to deposit.
+    uint256 minDepositAmount;
 
-        /// @notice The maximum amount of `mainToken` to deposit.
-        uint256 maxDepositAmount;
+    /// @notice The maximum amount of `mainToken` to deposit.
+    uint256 maxDepositAmount;
 
-        /// @notice The desirable distance to the LTV utilized when calculating position size.
-        /// This is typically set to around 1%, i.e., if Aave's LTV is 80%, we aim to maintain our position at 79%.
-        /// Note that this value needs to be multiplied by a factor of 100. For instance, "250" stands for 2.5%.
-        uint8 additionalLtvDistancePercent;
+    /// @notice Binary settings for the smart contract, as specified by the FLAGS_* constants.
+    uint8 flags;
 
-        /// @notice Binary settings for the smart contract, as specified by the FLAGS_* constants.
-        uint8 flags;
+    /// @notice The desirable distance to the LTV utilized when calculating position size.
+    /// This is typically set to around 1%, i.e., if Aave's LTV is 80%, we aim to maintain our position at 79%.
+    /// Note that this value needs to be multiplied by a factor of 100. For instance, "250" stands for 2.5%.
+    uint8 additionalLtvDistancePercent;
 
-        /// @notice The minimum threshold of debt or collateral difference between the current position and the
-        /// ideal calculated position that triggers an execution. Changes below this are disregarded.
-        /// Note that this value is set as a percentage and needs to be multiplied by 10. Therefore, "10" equates to 1%.
-        uint8 minRebalancePercent;
+    /// @notice The minimum threshold of debt or collateral difference between the current position and the
+    /// ideal calculated position that triggers an execution. Changes below this are disregarded.
+    /// Note that this value is set as a percentage and needs to be multiplied by 10. Therefore, "10" equates to 1%.
+    uint8 minRebalancePercent;
 
-        // 8 bit left here
-    }
-
-    /// @notice actual contract settings
-    Settings public settings;
+    // 8 bit left here
 
     IPoolAddressesProvider private aaveAddressProvider;
 
@@ -135,7 +129,6 @@ contract DeltaNeutralDollar2 is ERC20Upgradeable, OwnableUpgradeable, UUPSUpgrad
     /// @param _mainToken Address of the ERC-20 token accepted by this contract. Usually it is a staked ETH.
     /// @param _balancerVault The contract address of the Balancer's Vault, necessary for executing flash loans.
     /// @param _aaveAddressProvider The address of the Aave's ADDRESS_PROVIDER.
-    /// @param _settings Actual settings. See `Settings` structure in code.
     function initialize(
         bool _isMock,
         uint8 __decimals,
@@ -144,14 +137,13 @@ contract DeltaNeutralDollar2 is ERC20Upgradeable, OwnableUpgradeable, UUPSUpgrad
         address _stableToken,
         address _mainToken,
         address _balancerVault,
-        address _aaveAddressProvider,
-        Settings calldata _settings
+        address _aaveAddressProvider
     )
         public
         initializer
     {
         __ERC20_init(name, symbol);
-        // __Ownable_init(); // FIXME why not needed?
+        __Ownable_init(msg.sender);
 
         isMock = _isMock;
 
@@ -162,38 +154,24 @@ contract DeltaNeutralDollar2 is ERC20Upgradeable, OwnableUpgradeable, UUPSUpgrad
         pool = IPool(aaveAddressProvider.getPool()); // FIXME change back to calls, because what are we trying to save here really
         oracle = IAaveOracle(aaveAddressProvider.getPriceOracle());
 
-        settings = _settings;
-
         balancerVault = _balancerVault;
 
         mainToken = IERC20(_mainToken);
         stableToken = IERC20(_stableToken);
-
-        stableToken.approve(settings.swapHelper, 2 ** 256 - 1);
-        mainToken.approve(settings.swapHelper, 2 ** 256 - 1);
 
         mainTokenDecimals = IERC20Metadata(_mainToken).decimals();
         stableTokenDecimals = IERC20Metadata(_stableToken).decimals();
 
         mainToken.approve(address(pool), 2 ** 256 - 1);
         stableToken.approve(address(pool), 2 ** 256 - 1);
-
-        _transferOwnership(msg.sender);
     }
 
     // FIXME move to custom errors?
 
     function _authorizeUpgrade(address) internal override onlyOwner {}
 
-    /// _notice Retrieves the contract's current implementation address
-    /// _return The address of the active contract implementation
-    // FIXME check upgradeability today
-    // function implementation() public view returns (address) {
-    //     return _getImplementation();
-    // }
-
     modifier whenFlagNotSet(uint8 whatExactly) {
-        require((settings.flags & whatExactly) != whatExactly, ERROR_OPERATION_DISABLED_BY_FLAGS);
+        require((flags & whatExactly) != whatExactly, ERROR_OPERATION_DISABLED_BY_FLAGS);
         _;
     }
 
@@ -215,7 +193,7 @@ contract DeltaNeutralDollar2 is ERC20Upgradeable, OwnableUpgradeable, UUPSUpgrad
     /// @notice Closes the entire position, repaying all debt, withdrawing all collateral from Aave and deactivating the contract.
     /// Only accessible by the contract owner when the position hasn't been already closed.
     function closePosition() public whenFlagNotSet(FLAGS_POSITION_CLOSED) onlyOwner {
-        settings.flags = settings.flags | FLAGS_POSITION_CLOSED;
+        flags = flags | FLAGS_POSITION_CLOSED;
 
         uint256 debtMain = getTotalDebtMain();
         uint256 balanceMain = mainToken.balanceOf(address(this));
@@ -276,18 +254,18 @@ contract DeltaNeutralDollar2 is ERC20Upgradeable, OwnableUpgradeable, UUPSUpgrad
         collateralChangeBase = SafeCast.toInt256(idealTotalCollateralBase) - SafeCast.toInt256(totalCollateralBase);
 
         uint256 collateralChangePercent = Math.mulDiv(SignedMath.abs(collateralChangeBase), 1000, idealTotalCollateralBase);
-        if (collateralChangePercent < settings.minRebalancePercent) {
+        if (collateralChangePercent < minRebalancePercent) {
             collateralChangeBase = 0;
         }
 
-        uint256 idealLtv = ltv() - (settings.additionalLtvDistancePercent * 10);
+        uint256 idealLtv = ltv() - (additionalLtvDistancePercent * 10);
         uint256 idealTotalDebtBase = Math.mulDiv(idealTotalCollateralBase, idealLtv, 10000);
 
         // positive means borrow; negative: repay
         debtChangeBase = SafeCast.toInt256(idealTotalDebtBase) - SafeCast.toInt256(totalDebtBase);
 
         uint256 debtChangePercent = Math.mulDiv(SignedMath.abs(debtChangeBase), 1000, idealTotalDebtBase);
-        if (debtChangePercent < settings.minRebalancePercent) {
+        if (debtChangePercent < minRebalancePercent) {
             debtChangeBase = 0;
         }
     }
@@ -300,7 +278,7 @@ contract DeltaNeutralDollar2 is ERC20Upgradeable, OwnableUpgradeable, UUPSUpgrad
     }
 
     function _rebalance(bool shouldRevert) internal {
-        if (settings.flags & FLAGS_POSITION_CLOSED == FLAGS_POSITION_CLOSED) {
+        if (flags & FLAGS_POSITION_CLOSED == FLAGS_POSITION_CLOSED) {
             if (shouldRevert) {
                 revert(ERROR_POSITION_CLOSED);
             }
@@ -439,7 +417,7 @@ contract DeltaNeutralDollar2 is ERC20Upgradeable, OwnableUpgradeable, UUPSUpgrad
 
         uint256 mainToSwap = convertBaseToMain(convertStableToBase(flashLoanStable, stablePrice), mainPrice);
 
-        uint256 feeMain = ISwapHelper(settings.swapHelper).calcSwapFee(address(mainToken), address(stableToken), mainToSwap);
+        uint256 feeMain = ISwapHelper(swapHelper).calcSwapFee(address(mainToken), address(stableToken), mainToSwap);
         mainToSwap = mainToSwap + feeMain;
 
         // at this point we assume we always have enough main token to cover swap fees
@@ -542,7 +520,7 @@ contract DeltaNeutralDollar2 is ERC20Upgradeable, OwnableUpgradeable, UUPSUpgrad
         mainToken.transferFrom(msg.sender, address(this), amount);
 
         require(
-            amount >= settings.minDepositAmount && amount <= settings.maxDepositAmount,
+            amount >= minDepositAmount && amount <= maxDepositAmount,
             ERROR_INCORRECT_DEPOSIT_OR_WITHDRAWAL_AMOUNT
         );
 
@@ -634,7 +612,7 @@ contract DeltaNeutralDollar2 is ERC20Upgradeable, OwnableUpgradeable, UUPSUpgrad
     }
 
     function swap(IERC20 from, IERC20 to, uint256 amount) internal returns (uint256 swappedAmount) {
-        swappedAmount = ISwapHelper(settings.swapHelper).swap(address(from), address(to), amount);
+        swappedAmount = ISwapHelper(swapHelper).swap(address(from), address(to), amount);
     }
 
     function doFlashLoan(address token, uint256 amount, bytes memory userData) internal {
@@ -675,23 +653,52 @@ contract DeltaNeutralDollar2 is ERC20Upgradeable, OwnableUpgradeable, UUPSUpgrad
     }
     */
 
-    /// @notice Update contract's `settings`. Method is only available to owner.
-    function setSettings(Settings calldata _settings)
+    /// @notice Update contract's settings. Method is only available to owner.
+    /// @param _swapHelper Address of the contract that implements asset swapping functionality.
+    /// @param _minDepositAmount The minimum amount of `mainToken` to deposit.
+    /// @param _maxDepositAmount The maximum amount of `mainToken` to deposit.
+    /// @param _additionalLtvDistancePercent The desirable distance to the LTV utilized when calculating position size.
+    /// This is typically set to around 1%, i.e., if Aave's LTV is 80%, we aim to maintain our position at 79%.
+    /// Note that this value needs to be multiplied by a factor of 100. For instance, "250" stands for 2.5%.
+    /// @param _flags Binary settings for the smart contract, as specified by the `FLAGS_*` constants.
+    /// @param _minRebalancePercent The minimum threshold of debt or collateral difference between the current position and the
+    /// ideal calculated position that triggers an execution. Changes below this are disregarded.
+    /// Note that this value is set as a percentage and needs to be multiplied by 10. Therefore, "10" equates to 1%.
+    function setSettings(
+        address _swapHelper,
+        uint256 _minDepositAmount,
+        uint256 _maxDepositAmount,
+
+        uint8 _additionalLtvDistancePercent,
+        uint8 _flags,
+
+        uint8 _minRebalancePercent
+    )
         public
         onlyOwner
     {
-        address oldSwaphelper = settings.swapHelper;
-        settings = _settings;
+        minDepositAmount = _minDepositAmount;
+        maxDepositAmount = _maxDepositAmount;
+        additionalLtvDistancePercent = _additionalLtvDistancePercent;
+        flags = _flags;
+        minRebalancePercent = _minRebalancePercent;
 
-        if (oldSwaphelper == settings.swapHelper) {
+        address oldSwaphelper = swapHelper;
+        swapHelper = _swapHelper;
+
+        if (oldSwaphelper == swapHelper) {
+            return;
+        }
+
+        stableToken.approve(swapHelper, 2 ** 256 - 1);
+        mainToken.approve(swapHelper, 2 ** 256 - 1);
+
+        if (oldSwaphelper == address(0)) {
             return;
         }
 
         stableToken.approve(oldSwaphelper, 0);
         mainToken.approve(oldSwaphelper, 0);
-
-        stableToken.approve(settings.swapHelper, 2 ** 256 - 1);
-        mainToken.approve(settings.swapHelper, 2 ** 256 - 1);
     }
 
     function ltv() internal view returns (uint256) {

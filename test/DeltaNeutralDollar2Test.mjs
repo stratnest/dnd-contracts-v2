@@ -116,8 +116,7 @@ describe("DeltaNeutralDollar2", function() {
     [ myAccount, secondAccount, ownerAccount, liquidatorAccount ] = await hre.ethers.getSigners();
 
     const DeltaNeutralDollar = await ethers.getContractFactory('DeltaNeutralDollar2');
-    deltaNeutralDollar = await DeltaNeutralDollar.deploy();
-    await deltaNeutralDollar.waitForDeployment();
+    deltaNeutralDollar = await upgrades.deployProxy(DeltaNeutralDollar, [], { initializer: false, kind: 'uups' });
 
     let addressProvider;
 
@@ -210,17 +209,6 @@ describe("DeltaNeutralDollar2", function() {
       ]);
     }
 
-    const settings = {
-      swapHelper: await swapHelper.getAddress(),
-
-      minDepositAmount: 10n ** 18n / 100n, // 0.01 ETH
-      maxDepositAmount: 10n ** 18n * 2n, // 2 ETH
-
-      additionalLtvDistancePercent: 10,
-      flags: 0,
-      minRebalancePercent: 10 // 1.5%
-    };
-
     await deltaNeutralDollar.initialize(
       currentChain == CHAIN_LOCAL,
       8,
@@ -229,8 +217,18 @@ describe("DeltaNeutralDollar2", function() {
       await stableToken.getAddress(),
       await mainToken.getAddress(),
       balancerVaultAddress,
-      await addressProvider.getAddress(),
-      settings
+      await addressProvider.getAddress()
+    );
+
+    await deltaNeutralDollar.setSettings(
+      await swapHelper.getAddress(),
+
+      10n ** 18n / 100n, // minDepositAmount
+      10n ** 18n * 2n, // maxDepositAmount
+
+      10, // additionalLtvDistancePercent
+      0, // flags
+      10 // 1.0%, minRebalancePercent
     );
 
     await deltaNeutralDollar.transferOwnership(ownerAccount.address);
@@ -608,18 +606,16 @@ describe("DeltaNeutralDollar2", function() {
   });
 
   it("only owner can set settings and mappings", async () => {
-    const settings = {
-      swapHelper: ethers.ZeroAddress,
+    await expect(deltaNeutralDollar.setSettings(
+      ethers.ZeroAddress,
 
-      minDepositAmount: 0,
-      maxDepositAmount: 10n ** 18n * 2n, // 2 ETH
+      0,
+      10n ** 18n * 2n,
 
-      additionalLtvDistancePercent: 0,
-      flags: 0,
-      minRebalancePercent: 0
-    };
-
-    await expect(deltaNeutralDollar.setSettings(settings)).to.be.revertedWithCustomError(deltaNeutralDollar, "OwnableUnauthorizedAccount");
+      0,
+      0,
+      0
+    )).to.be.revertedWithCustomError(deltaNeutralDollar, "OwnableUnauthorizedAccount");
   });
 
   it("only owner can rescue tokens", async () => {
@@ -636,9 +632,14 @@ describe("DeltaNeutralDollar2", function() {
   it("cannot deposit when flags disabled", async () => {
     await deltaNeutralDollar.deposit(ONE_ETHER / 2n);
 
-    const settings = (await deltaNeutralDollar.settings()).toObject();
-    settings.flags = FLAGS_DEPOSIT_PAUSED;
-    await deltaNeutralDollar.connect(ownerAccount).setSettings(settings);
+    await deltaNeutralDollar.connect(ownerAccount).setSettings(
+      await deltaNeutralDollar.swapHelper(),
+      0,
+      10n ** 18n * 200n,
+      10,
+      FLAGS_DEPOSIT_PAUSED,
+      10
+    );
 
     await expect(deltaNeutralDollar.deposit(ONE_ETHER / 2n)).to.be.revertedWith(ERROR_OPERATION_DISABLED_BY_FLAGS);
 
@@ -648,9 +649,14 @@ describe("DeltaNeutralDollar2", function() {
   it("cannot withdraw when flags disabled", async () => {
     await deltaNeutralDollar.deposit(ONE_ETHER / 2n);
 
-    const settings = (await deltaNeutralDollar.settings()).toObject();
-    settings.flags = FLAGS_WITHDRAW_PAUSED;
-    await deltaNeutralDollar.connect(ownerAccount).setSettings(settings);
+    await deltaNeutralDollar.connect(ownerAccount).setSettings(
+      await deltaNeutralDollar.swapHelper(),
+      0,
+      10n ** 18n * 200n,
+      10,
+      FLAGS_WITHDRAW_PAUSED,
+      10
+    );
 
     await expect(deltaNeutralDollar.withdraw(100)).to.be.revertedWith(ERROR_OPERATION_DISABLED_BY_FLAGS);
 
@@ -712,9 +718,16 @@ describe("DeltaNeutralDollar2", function() {
     expect(diff.debtChangeBase).to.be.gt(0);
     expect(diff.collateralChangeBase).to.be.eq(0);
 
-    const settings = (await deltaNeutralDollar.settings()).toObject();
-    settings.minRebalancePercent = 41; // 4.1% is larger than 4% price difference we have just mocked
-    await deltaNeutralDollar.connect(ownerAccount).setSettings(settings);
+    await deltaNeutralDollar.connect(ownerAccount).setSettings(
+      await swapHelper.getAddress(),
+
+      10n ** 18n / 100n, // minDepositAmount
+      10n ** 18n * 2n, // maxDepositAmount
+
+      10, // additionalLtvDistancePercent
+      0, // flags
+      41 // 1.0%, minRebalancePercent
+    );
 
     diff = await deltaNeutralDollar.calculateRequiredPositionChange();
     expect(diff.debtChangeBase).to.be.eq(0);

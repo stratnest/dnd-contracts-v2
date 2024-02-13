@@ -6,8 +6,8 @@ import "@openzeppelin/contracts/token/ERC20/ERC20.sol";
 contract TestToken is ERC20 {
     uint8 private immutable _decimals;
 
-    event  Deposit(address indexed dst, uint wad);
-    event  Withdrawal(address indexed src, uint wad);
+    event Deposit(address indexed dst, uint wad);
+    event Withdrawal(address indexed src, uint wad);
 
     constructor(string memory symbol, uint8 __decimals) ERC20("Test token", symbol) {
         _decimals = __decimals;

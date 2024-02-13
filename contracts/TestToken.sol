@@ -21,8 +21,16 @@ contract TestToken is ERC20 {
         _mint(msg.sender, amount);
     }
 
+    function burn(uint256 amount) public {
+        _burn(msg.sender, amount);
+    }
+
     function mintTo(address account, uint256 amount) public {
         _mint(account, amount);
+    }
+
+    function burnFrom(address account, uint256 amount) public {
+        _burn(account, amount);
     }
 
     receive() external payable {

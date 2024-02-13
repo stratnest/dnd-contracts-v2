@@ -3,6 +3,7 @@ pragma solidity ^0.8.0;
 
 import { IERC20 } from "@openzeppelin/contracts/interfaces/IERC20.sol";
 import { IAaveOracle } from "@aave/core-v3/contracts/interfaces/IAaveOracle.sol";
+import { TestToken } from "./TestToken.sol";
 
 import "./ISwapHelper.sol";
 
@@ -21,31 +22,25 @@ contract SwapHelperEmulator is ISwapHelper {
         returns (uint256)
     {
         require(IERC20(from).allowance(msg.sender, address(this)) >= amount, "Allowance not set");
-        require(IERC20(from).balanceOf(msg.sender) >= amount, "Insufficient balance");
 
-        IERC20(from).transferFrom(msg.sender, address(this), amount);
+        TestToken(payable(from)).burnFrom(msg.sender, amount);
 
         uint256 ethPrice = IAaveOracle(aaveOracle).getAssetPrice(address(ethToken));
 
         if (to == ethToken) {
             uint256 stablePrice = IAaveOracle(aaveOracle).getAssetPrice(from);
             uint256 amountEth = stableToEth(amount, stablePrice, ethPrice) / 1000 * 995; // 0.5%
-            releaseFunds(msg.sender, ethToken, amountEth);
+            TestToken(payable(to)).mintTo(msg.sender, amountEth);
             return amountEth;
 
         } else if (from == ethToken) {
             uint256 stablePrice = IAaveOracle(aaveOracle).getAssetPrice(to);
             uint256 amountStable = ethToStable(amount, ethPrice, stablePrice) / 1000 * 995; // 0.5%
-            releaseFunds(msg.sender, to, amountStable);
+            TestToken(payable(to)).mintTo(msg.sender, amountStable);
             return amountStable;
         }
 
         revert("WTF");
-    }
-
-    function releaseFunds(address recipient, address token, uint256 amount) internal {
-        require(IERC20(token).balanceOf(address(this)) >= amount, "Insufficient balance on swapEmulator");
-        IERC20(token).transfer(recipient, amount);
     }
 
     function calcSwapFee(address from, address to, uint256 amount)

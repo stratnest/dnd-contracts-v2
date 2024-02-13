@@ -6,8 +6,7 @@ import { IERC20Metadata } from "@openzeppelin/contracts/token/ERC20/extensions/I
 import { IAaveOracle } from "@aave/core-v3/contracts/interfaces/IAaveOracle.sol";
 import { IPoolAddressesProvider } from "@aave/core-v3/contracts/interfaces/IPoolAddressesProvider.sol";
 import { Ownable } from "@openzeppelin/contracts/access/Ownable.sol";
-
-import "hardhat/console.sol";
+import { TestToken } from "../TestToken.sol";
 
 struct ReserveConfigurationMapEmulator {
   //bit 0-15: LTV
@@ -78,7 +77,6 @@ contract PoolEmulator is Ownable {
     require(msg.sender == onBehalfOf, "Only self borrow");
 
     require(amount > 0, "zero");
-    require(IERC20(asset).balanceOf(address(this)) >= amount, "Insufficient balance");
 
     if (borrowAsset == address(0)) {
       borrowAsset = asset;
@@ -87,7 +85,8 @@ contract PoolEmulator is Ownable {
     require(borrowAsset == asset, "Only one asset is supported");
 
     debtBalanceOf[msg.sender] += amount;
-    IERC20(asset).transfer(msg.sender, amount);
+
+    TestToken(payable(asset)).mintTo(msg.sender, amount);
   }
 
   function repay(
@@ -104,8 +103,9 @@ contract PoolEmulator is Ownable {
 
     require(borrowAsset == asset, "Only one asset is supported");
 
-    IERC20(asset).transferFrom(msg.sender, address(this), amountToRepay);
     debtBalanceOf[onBehalfOf] -= amountToRepay;
+
+    TestToken(payable(asset)).burnFrom(msg.sender, amountToRepay);
 
     return amountToRepay;
   }

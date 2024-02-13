@@ -267,11 +267,19 @@ describe("DeltaNeutralDollar2", function() {
   }
 
   async function getMainToken(target, amount) {
-    await deal(mainToken.address, await getAddressOfTarget(target), amount);
+    if (currentChain == CHAIN_LOCAL) {
+      await mainToken.mintTo(await getAddressOfTarget(target), amount);
+    } else {
+      await deal(mainToken.address, await getAddressOfTarget(target), amount);
+    }
   }
 
   async function getStableToken(target, amount) {
-    await deal(stableToken.address, await getAddressOfTarget(target), amount);
+    if (currentChain == CHAIN_LOCAL) {
+      await stableToken.mintTo(await getAddressOfTarget(target), amount);
+    } else {
+      await deal(stableToken.address, await getAddressOfTarget(target), amount);
+    }
   }
 
   function formatBaseInUSDC(v, usdcPrice) {

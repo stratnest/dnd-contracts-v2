@@ -768,52 +768,60 @@ describe("DeltaNeutralDollar2", function() {
     expect(diff.toObject()).to.deep.equal({ collateralChangeBase: 0n, debtChangeBase: 0n });
   });
 
-  if (currentChain !== CHAIN_LOCAL) {
-    it("basic liquidation test, no contracts", async () => {
-      await stableToken.approve(await aavePool.getAddress(), 2n ** 256n - 1n);
-      await getStableToken(myAccount, mainTokenPrice / 10n ** 2n * 2n); // usdc is 6 decimals, prices are 8 decimals
-      await aavePool.supply(await stableToken.getAddress(), mainTokenPrice / 10n ** 2n * 2n, myAccount.address, 0);
+  it("basic liquidation test, no contracts", async function() {
+    if (currentChain === CHAIN_LOCAL) {
+      this.skip();
+      return;
+    }
 
-      const { availableBorrowsBase } = await aavePool.getUserAccountData(myAccount.address);
-      const borrowMainToken = availableBorrowsBase * 10n ** 18n / mainTokenPrice;
+    await stableToken.approve(await aavePool.getAddress(), 2n ** 256n - 1n);
+    await getStableToken(myAccount, mainTokenPrice / 10n ** 2n * 2n); // usdc is 6 decimals, prices are 8 decimals
+    await aavePool.supply(await stableToken.getAddress(), mainTokenPrice / 10n ** 2n * 2n, myAccount.address, 0);
 
-      await aavePool.borrow(await mainToken.getAddress(), borrowMainToken, 2, 0, myAccount.address);
+    const { availableBorrowsBase } = await aavePool.getUserAccountData(myAccount.address);
+    const borrowMainToken = availableBorrowsBase * 10n ** 18n / mainTokenPrice;
 
-      const userDataBefore = await aavePool.getUserAccountData(myAccount.address);
+    await aavePool.borrow(await mainToken.getAddress(), borrowMainToken, 2, 0, myAccount.address);
 
-      await aaveOracle.setOverridePrice(await mainToken.getAddress(), mainTokenPrice / 100n * 108n);
+    const userDataBefore = await aavePool.getUserAccountData(myAccount.address);
 
-      expect(await liquidate(myAccount.address, stableToken, mainToken)).to.be.true;
+    await aaveOracle.setOverridePrice(await mainToken.getAddress(), mainTokenPrice / 100n * 108n);
 
-      const userDataAfter = await aavePool.getUserAccountData(myAccount.address);
+    expect(await liquidate(myAccount.address, stableToken, mainToken)).to.be.true;
 
-      expect(userDataAfter.totalCollateralBase).to.be.lt(userDataBefore.totalCollateralBase);
-      expect(userDataAfter.totalDebtBase).to.be.lt(userDataBefore.totalDebtBase);
-    });
+    const userDataAfter = await aavePool.getUserAccountData(myAccount.address);
 
-    it("eth price up then liquidation then close", async () => {
-      await deltaNeutralDollar.deposit(ONE_ETHER);
+    expect(userDataAfter.totalCollateralBase).to.be.lt(userDataBefore.totalCollateralBase);
+    expect(userDataAfter.totalDebtBase).to.be.lt(userDataBefore.totalDebtBase);
+  });
 
-      // burn to zero
-      await mainToken.transfer(liquidatorAccount.address, await mainToken.balanceOf(myAccount.address));
+  it("eth price up then liquidation then close", async function() {
+    if (currentChain === CHAIN_LOCAL) {
+      this.skip();
+      return;
+    }
 
-      const baseBalanceBefore = await deltaNeutralDollar.balanceOf(myAccount.address);
-      const totalBalanceBefore = await deltaNeutralDollar.totalBalanceBase();
+    await deltaNeutralDollar.deposit(ONE_ETHER);
 
-      const higherMainTokenPrice = mainTokenPrice / 100n * 108n;
+    // burn to zero
+    await mainToken.transfer(liquidatorAccount.address, await mainToken.balanceOf(myAccount.address));
 
-      await aaveOracle.setOverridePrice(await mainToken.getAddress(), higherMainTokenPrice);
+    const baseBalanceBefore = await deltaNeutralDollar.balanceOf(myAccount.address);
+    const totalBalanceBefore = await deltaNeutralDollar.totalBalanceBase();
 
-      expect(await liquidate(await deltaNeutralDollar.getAddress(), stableToken, mainToken)).to.be.true;
+    const higherMainTokenPrice = mainTokenPrice / 100n * 108n;
 
-      expect(await deltaNeutralDollar.balanceOf(myAccount.address)).to.be.withinPercent(baseBalanceBefore, 1);
-      expect(await deltaNeutralDollar.totalBalanceBase()).to.be.withinPercent(totalBalanceBefore / 100n * 98n, 1); // two percent liquidation hit
+    await aaveOracle.setOverridePrice(await mainToken.getAddress(), higherMainTokenPrice);
 
-      await deltaNeutralDollar.connect(ownerAccount).closePosition();
+    expect(await liquidate(await deltaNeutralDollar.getAddress(), stableToken, mainToken)).to.be.true;
 
-      expect(await mainToken.balanceOf(await deltaNeutralDollar.getAddress())).to.be.withinPercent(ONE_ETHER / 100n * 90n, 1); // 2% hit and 8% price difff
-    });
-  }
+    expect(await deltaNeutralDollar.balanceOf(myAccount.address)).to.be.withinPercent(baseBalanceBefore, 1);
+    expect(await deltaNeutralDollar.totalBalanceBase()).to.be.withinPercent(totalBalanceBefore / 100n * 98n, 1); // two percent liquidation hit
+
+    await deltaNeutralDollar.connect(ownerAccount).closePosition();
+
+    expect(await mainToken.balanceOf(await deltaNeutralDollar.getAddress())).to.be.withinPercent(ONE_ETHER / 100n * 90n, 1); // 2% hit and 8% price difff
+  });
 
   it("multiple users", async () => {
     await deltaNeutralDollar.deposit(ONE_ETHER);

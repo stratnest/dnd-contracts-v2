@@ -904,6 +904,7 @@ describe("DeltaNeutralDollar2", function() {
 
     await expect(
       deltaNeutralDollar.initialize(
+        true,
         8,
         "DNH",
         "Delta Neutral Dollar",

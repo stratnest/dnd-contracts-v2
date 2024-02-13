@@ -4,6 +4,7 @@ require('hardhat-abi-exporter');
 require('hardhat-contract-sizer');
 require('hardhat-deal');
 require('solidity-docgen');
+require('@openzeppelin/hardhat-upgrades');
 
 const helpers = require('@nomicfoundation/hardhat-network-helpers');
 

@@ -153,18 +153,11 @@ contract PoolEmulator is Ownable {
       availableBorrowsBase = maxBorrowBase - totalDebtBase;
     }
 
-    console.log(" totalCollateralBase", totalCollateralBase);
-    console.log("       totalDebtBase", totalDebtBase);
-    console.log("       maxBorrowBase", maxBorrowBase);
-    console.log("availableBorrowsBase", availableBorrowsBase);
-
     if (totalDebtBase > 0) {
       healthFactor = totalCollateralBase * LIQUIDATION_THRESHOLD * 1e18 / totalDebtBase / 10000;
-      console.log("        healthFactor", healthFactor);
 
     } else {
       healthFactor = type(uint256).max;
-      console.log("        healthFactor max");
     }
   }
 

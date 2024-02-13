@@ -671,12 +671,13 @@ contract DeltaNeutralDollar2 is ERC20Upgradeable, OwnableUpgradeable, UUPSUpgrad
         flags = _flags;
         minRebalancePercent = _minRebalancePercent;
 
-        address oldSwaphelper = swapHelper;
-        swapHelper = _swapHelper;
-
-        if (oldSwaphelper == swapHelper) {
+        if (swapHelper == _swapHelper) {
             return;
         }
+
+        address oldSwaphelper = swapHelper;
+
+        swapHelper = _swapHelper;
 
         stableToken.approve(swapHelper, 2 ** 256 - 1);
         mainToken.approve(swapHelper, 2 ** 256 - 1);

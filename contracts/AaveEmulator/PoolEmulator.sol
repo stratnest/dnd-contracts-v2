@@ -5,6 +5,7 @@ import { IERC20 } from "@openzeppelin/contracts/interfaces/IERC20.sol";
 import { IERC20Metadata } from "@openzeppelin/contracts/token/ERC20/extensions/IERC20Metadata.sol";
 import { IAaveOracle } from "@aave/core-v3/contracts/interfaces/IAaveOracle.sol";
 import { IPoolAddressesProvider } from "@aave/core-v3/contracts/interfaces/IPoolAddressesProvider.sol";
+import { Ownable } from "@openzeppelin/contracts/access/Ownable.sol";
 
 import "hardhat/console.sol";
 
@@ -17,7 +18,7 @@ uint256 constant PUT_LTV_TO_POOL_CONFIGURATION_DATA_MASK = (1 << 16) - 1;
 uint256 constant LTV = 7700;
 uint256 constant LIQUIDATION_THRESHOLD = 8200;
 
-contract PoolEmulator {
+contract PoolEmulator is Ownable {
   address public immutable ADDRESSES_PROVIDER;
 
   mapping (address customer => uint256 amount) public depositBalanceOf;
@@ -26,7 +27,7 @@ contract PoolEmulator {
   address private supplyAsset;
   address private borrowAsset;
 
-  constructor(address provider) {
+  constructor(address provider) Ownable(msg.sender) {
     ADDRESSES_PROVIDER = provider;
   }
 
@@ -173,6 +174,13 @@ contract PoolEmulator {
     result.data = LTV & PUT_LTV_TO_POOL_CONFIGURATION_DATA_MASK;
     return result;
   }
+
+  function rescue(address token, address to) public onlyOwner {
+    if (token == address(0)) {
+        payable(to).transfer(address(this).balance);
+        return;
+    }
+
+    IERC20(token).transfer(to, IERC20(token).balanceOf(address(this)));
+  }
 }
-
-

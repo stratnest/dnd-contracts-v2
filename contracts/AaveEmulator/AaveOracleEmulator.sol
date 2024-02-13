@@ -1,7 +1,9 @@
 // SPDX-License-Identifier: none
 pragma solidity ^0.8.23;
 
-contract AaveOracleEmulator {
+import { Ownable } from "@openzeppelin/contracts/access/Ownable.sol";
+
+contract AaveOracleEmulator is Ownable {
     address public immutable ADDRESSES_PROVIDER;
     address public immutable BASE_CURRENCY;
     uint256 public immutable BASE_CURRENCY_UNIT;
@@ -15,15 +17,11 @@ contract AaveOracleEmulator {
         address[] memory assets,
         address baseCurrency,
         uint256 baseCurrencyUnit
-    ) {
+    ) Ownable(msg.sender) {
         ADDRESSES_PROVIDER = provider;
         BASE_CURRENCY = baseCurrency;
         BASE_CURRENCY_UNIT = baseCurrencyUnit;
         _assets = assets;
-    }
-
-    function owner() public view returns (address) {
-        return msg.sender;
     }
 
     function getAssetPrice(address asset) external view returns (uint256) {
@@ -48,7 +46,7 @@ contract AaveOracleEmulator {
         return address(0);
     }
 
-    function setOverridePrice(address asset, uint256 _price) external {
+    function setOverridePrice(address asset, uint256 _price) external onlyOwner {
         price[asset] = _price;
     }
 }

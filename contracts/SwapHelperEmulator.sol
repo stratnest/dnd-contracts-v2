@@ -7,11 +7,11 @@ import { IAaveOracle } from "@aave/core-v3/contracts/interfaces/IAaveOracle.sol"
 import "./ISwapHelper.sol";
 
 contract SwapHelperEmulator is ISwapHelper {
-    address private wstethToken;
+    address private ethToken;
     address private aaveOracle;
 
     constructor(address _ethToken, address _aaveOracle) {
-        wstethToken = _ethToken;
+        ethToken = _ethToken;
         aaveOracle = _aaveOracle;
     }
 
@@ -25,17 +25,17 @@ contract SwapHelperEmulator is ISwapHelper {
 
         IERC20(from).transferFrom(msg.sender, address(this), amount);
 
-        uint256 wstethPrice = IAaveOracle(aaveOracle).getAssetPrice(address(wstethToken));
+        uint256 ethPrice = IAaveOracle(aaveOracle).getAssetPrice(address(ethToken));
 
-        if (to == wstethToken) {
+        if (to == ethToken) {
             uint256 stablePrice = IAaveOracle(aaveOracle).getAssetPrice(from);
-            uint256 amountEth = stableToEth(amount, stablePrice, wstethPrice) / 1000 * 995; // 0.5%
-            releaseFunds(msg.sender, wstethToken, amountEth);
+            uint256 amountEth = stableToEth(amount, stablePrice, ethPrice) / 1000 * 995; // 0.5%
+            releaseFunds(msg.sender, ethToken, amountEth);
             return amountEth;
 
-        } else if (from == wstethToken) {
+        } else if (from == ethToken) {
             uint256 stablePrice = IAaveOracle(aaveOracle).getAssetPrice(to);
-            uint256 amountStable = ethToStable(amount, wstethPrice, stablePrice) / 1000 * 995; // 0.5%
+            uint256 amountStable = ethToStable(amount, ethPrice, stablePrice) / 1000 * 995; // 0.5%
             releaseFunds(msg.sender, to, amountStable);
             return amountStable;
         }

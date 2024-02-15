@@ -39,6 +39,11 @@ module.exports = {
     sepolia: {
       url: `https://sepolia.infura.io/v3/${INFURA_API_KEY}`,
       accounts
+    },
+
+    blastTestnet: {
+      url: `https://sepolia.blast.io`,
+      accounts
     }
   },
 
@@ -48,8 +53,20 @@ module.exports = {
       optimisticEthereum: vars.get('ETHERSCAN_OPTIMISTIC_ETHEREUM', null),
       arbitrumOne: vars.get('ETHERSCAN_ARBITRUM_ONE', null),
       polygon: vars.get('ETHERSCAN_POLYGON', null),
-      sepolia: vars.get('ETHERSCAN_ETHEREUM', null)
-    }
+      sepolia: vars.get('ETHERSCAN_ETHEREUM', null),
+      blastTestnet: 'blastTestnet' // apiKey is not required, just set a placeholder
+    },
+
+    customChains: [
+      {
+        network: 'blastTestnet',
+        chainId: 168587773,
+        urls: {
+          apiURL: 'https://api.routescan.io/v2/network/testnet/evm/168587773/etherscan',
+          browserURL: 'https://testnet.blastscan.io'
+        }
+      }
+    ]
   },
 
   solidity: {

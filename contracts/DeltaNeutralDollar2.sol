@@ -71,7 +71,7 @@ contract DeltaNeutralDollar2 is ERC20Upgradeable, OwnableUpgradeable, UUPSUpgrad
     /// Note that this value is set as a percentage and needs to be multiplied by 10. Therefore, "10" equates to 1%.
     uint8 minRebalancePercent;
 
-    // 8 bit left here
+    uint8 private eightBitGap1; // 8 bits left here
 
     IPoolAddressesProvider private aaveAddressProvider;
 
@@ -91,7 +91,9 @@ contract DeltaNeutralDollar2 is ERC20Upgradeable, OwnableUpgradeable, UUPSUpgrad
     uint8 private stableTokenDecimals;
     uint8 private mainTokenDecimals;
     bool private isMock;
-    // 8 bits left here
+    uint8 private eightBitGap2; // 8 bits left here
+
+    uint256[40] private __gap;
 
     /// @notice Event triggered post-execution of position change by deposit, withdrawal or direct execution of the `rebalance()` function.
     /// @param mainBalance Post-rebalance balance of `mainToken`

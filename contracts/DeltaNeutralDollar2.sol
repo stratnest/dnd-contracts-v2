@@ -53,23 +53,23 @@ contract DeltaNeutralDollar2 is ERC20Upgradeable, OwnableUpgradeable, UUPSUpgrad
     address public swapHelper;
 
     /// @notice The minimum amount of `mainToken` to deposit.
-    uint256 minDepositAmount;
+    uint256 public minDepositAmount;
 
     /// @notice The maximum amount of `mainToken` to deposit.
-    uint256 maxDepositAmount;
+    uint256 public maxDepositAmount;
 
     /// @notice Binary settings for the smart contract, as specified by the FLAGS_* constants.
-    uint8 flags;
+    uint8 public flags;
 
     /// @notice The desirable distance to the LTV utilized when calculating position size.
     /// This is typically set to around 1%, i.e., if Aave's LTV is 80%, we aim to maintain our position at 79%.
     /// Note that this value needs to be multiplied by a factor of 100. For instance, "250" stands for 2.5%.
-    uint8 additionalLtvDistancePercent;
+    uint8 public additionalLtvDistancePercent;
 
     /// @notice The minimum threshold of debt or collateral difference between the current position and the
     /// ideal calculated position that triggers an execution. Changes below this are disregarded.
     /// Note that this value is set as a percentage and needs to be multiplied by 10. Therefore, "10" equates to 1%.
-    uint8 minRebalancePercent;
+    uint8 public minRebalancePercent;
 
     uint8 private eightBitGap1; // 8 bits left here
 

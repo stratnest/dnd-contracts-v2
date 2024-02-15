@@ -1,6 +1,6 @@
-# DND source code
+# Stratnest smart contracts
 
-This is the main repository for smart contracts source code.
+This is the main repository for smart contracts source code for StratNest protocol https://stratnest.net.
 
 # Requirements
 
@@ -9,12 +9,13 @@ We are using [hardhat](https://hardhat.org) so a recent node.js v21 version is a
 # Hardhat vars
 
 ```bash
-npx hardhat vars set INFURA_API_KEY YOUR_API_KEY
+npx hardhat vars set INFURA_API_KEY your infura api key
+npx hardhat vars set PRIVATE_KEY your private key
 ```
 
 # Testing
 
-Fork Arbitrum One, Optimism, Polygon or Base:
+Fork Arbitrum One or Optimism:
 
 ```bash
 npx hardhat node --fork https://arbitrum-mainnet.infura.io/v3/YOUR_API_KEY

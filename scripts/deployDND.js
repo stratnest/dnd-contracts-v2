@@ -1,42 +1,18 @@
 let mainToken;
 let stableToken;
 
-async function getAddressOfTarget(target) {
-  if (target.address) {
-    return target.address;
-  }
-
-  if (target.getAddress) {
-    return await target.getAddress();
-  }
-
-  return target;
-}
-
-async function getMainToken(target, amount) {
-  await mainToken.mintTo(await getAddressOfTarget(target), amount);
-}
-
-async function getStableToken(target, amount) {
-  await stableToken.mintTo(await getAddressOfTarget(target), amount);
-}
-
 async function main() {
-  const DeltaNeutralDollar = await ethers.getContractFactory('DeltaNeutralDollar2');
-  const deltaNeutralDollar = await DeltaNeutralDollar.deploy();
-  await deltaNeutralDollar.waitForDeployment();
-  console.log("DeltaNeutralDollar2", await deltaNeutralDollar.getAddress());
-
   const TestToken = await ethers.getContractFactory('TestToken');
 
-  stableToken = await TestToken.deploy('STABLE', 6);
+  stableToken = await TestToken.deploy('testUSD', 6);
   await stableToken.waitForDeployment();
   stableToken.address = await stableToken.getAddress();
+  console.log("stable", stableToken.address);
 
-  mainToken = await TestToken.deploy('MAIN', 18);
+  mainToken = await TestToken.deploy('testETH', 18);
   await mainToken.waitForDeployment();
   mainToken.address = await mainToken.getAddress();
-  console.log("weth", mainToken.address);
+  console.log("main ", mainToken.address);
 
   const AddressProvider = await ethers.getContractFactory('PoolAddressesProviderEmulator');
   const addressProvider = await AddressProvider.deploy();
@@ -48,10 +24,8 @@ async function main() {
   await aavePool.waitForDeployment();
   console.log("PoolEmulator", await aavePool.getAddress());
 
-  await getMainToken(aavePool, 1000n * 10n ** 18n);
-  await getStableToken(aavePool, 1000n * 2000n * 10n ** 6n);
-
   await addressProvider.setAddress(0, await aavePool.getAddress());
+  console.log("pool address set");
 
   const AaveOracleEmulator = await ethers.getContractFactory('AaveOracleEmulator');
   const aaveOracle = await AaveOracleEmulator.deploy(
@@ -64,51 +38,60 @@ async function main() {
     100000000n
   );
   await aaveOracle.waitForDeployment();
+  console.log("AaveOracleEmulator", await aaveOracle.getAddress());
+
   await addressProvider.setPriceOracle(await aaveOracle.getAddress());
 
-  await aaveOracle.setOverridePrice(await mainToken.getAddress(), 2000n * 10n**8n);
+  await aaveOracle.setOverridePrice(await mainToken.getAddress(), 2700n * 10n**8n);
   await aaveOracle.setOverridePrice(await stableToken.getAddress(), 99999000);
+
+  console.log("Prices updated");
 
   const SwapHelper = await ethers.getContractFactory('SwapHelperEmulator');
   let swapHelper = await SwapHelper.deploy(await mainToken.getAddress(), await aaveOracle.getAddress());
   await swapHelper.waitForDeployment();
-
-  await Promise.all([
-    getMainToken(swapHelper, 10n * 10n ** 18n),
-    getStableToken(swapHelper, 10000n * 10n ** 6n),
-  ]);
+  console.log("SwapHelperEmulator", await swapHelper.getAddress());
 
   const BalancerVaultEmulator = await ethers.getContractFactory('BalancerVaultEmulator');
   const balancerVaultEmulator = await BalancerVaultEmulator.deploy();
   await balancerVaultEmulator.waitForDeployment();
+  console.log("BalancerVaultEmulator", await balancerVaultEmulator.getAddress());
 
-  await getMainToken(balancerVaultEmulator, 100n * 10n**18n);
-  await getStableToken(balancerVaultEmulator, 1_000_000n * 10n**6n);
-
-  const settings = {
-    swapHelper: await swapHelper.getAddress(),
-
-    minDepositAmount: 10n ** 18n / 100n, // 0.01 ETH
-    maxDepositAmount: 10n ** 18n * 2n, // 2 ETH
-
-    additionalLtvDistancePercent: 10,
-    flags: 0,
-    minRebalancePercent: 10 // 1.5%
-  };
-
-  await deltaNeutralDollar.initialize(
-    true,
+  const dndArguments = [
+    true, // ismock
     8,
     "DND",
     "Stratnest",
     await stableToken.getAddress(),
     await mainToken.getAddress(),
     await balancerVaultEmulator.getAddress(),
-    await addressProvider.getAddress(),
-    settings
+    await addressProvider.getAddress()
+  ];
+
+  const DeltaNeutralDollar = await ethers.getContractFactory('DeltaNeutralDollar2');
+  const deltaNeutralDollar = await upgrades.deployProxy(
+    DeltaNeutralDollar,
+    dndArguments,
+    {
+      initializer: 'initialize',
+      kind: 'uups'
+    }
+  );
+  await deltaNeutralDollar.waitForDeployment();
+  console.log("DeltaNeutralDollar2", await deltaNeutralDollar.getAddress());
+
+  await deltaNeutralDollar.setSettings(
+    await swapHelper.getAddress(),
+
+    10n ** 18n / 100n, // min
+    10n ** 18n / 10n, // max
+
+    10, // additionalLtvDistancePercent
+    0, // flags
+    10 // minRebalancePercent, 10%
   );
 
-  await mainToken.approve(await deltaNeutralDollar.getAddress(), 2n ** 256n - 1n);
+  console.log("Settings set");
 }
 
 main()

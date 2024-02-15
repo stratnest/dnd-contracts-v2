@@ -23,7 +23,7 @@
     "@uniswap/v3-periphery": "^1.4.3",
     "ethers": "^6.10.0",
     "hardhat": "^2.19.1",
-    "hardhat-abi-exporter": "^2.10.1",
+    "hardhat-abi-exporter": "github:ItsNickBarry/hardhat-abi-exporter",
     "hardhat-contract-sizer": "^2.10.0",
     "hardhat-deal": "^3.0.3",
     "solhint": "^4.0.0",

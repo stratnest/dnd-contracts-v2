@@ -302,37 +302,29 @@ contract DeltaNeutralDollar2 is ERC20Upgradeable, OwnableUpgradeable, UUPSUpgrad
         }
 
         if (collateralChangeBase > 0 && debtChangeBase > 0) {
-            // console.log("C00 ==> Supply collateral then borrow debt");
             implementSupplyThenBorrow(SignedMath.abs(collateralChangeBase), SignedMath.abs(debtChangeBase), mainPrice);
 
         } else if (collateralChangeBase < 0 && debtChangeBase < 0) {
-            // console.log("C00 ==> Repay debt then withdraw collateral");
             implementRepayThenWithdraw(SignedMath.abs(collateralChangeBase), SignedMath.abs(debtChangeBase), mainPrice);
 
         } else if (collateralChangeBase > 0 && debtChangeBase < 0) {
-            // console.log("C00 ==> Repay debt then supply collateral"); // not found yet
             implementRepay(SignedMath.abs(debtChangeBase), mainPrice);
             implementSupply(SignedMath.abs(collateralChangeBase), mainPrice);
 
         } else if (collateralChangeBase < 0 && debtChangeBase > 0) {
-            // console.log("C00 ==> Borrow debt and withdraw collateral"); // not found yet
             implementWithdraw(SignedMath.abs(collateralChangeBase), oracle.getAssetPrice(address(stableToken)));
             implementBorrow(SignedMath.abs(debtChangeBase), mainPrice);
 
         } else if (collateralChangeBase == 0 && debtChangeBase > 0) {
-            // console.log("C00 ==> Just borrow debt");
             implementBorrow(SignedMath.abs(debtChangeBase), mainPrice);
 
         } else if (collateralChangeBase == 0 && debtChangeBase < 0) {
-            // console.log("C00 ==> Just repay debt");
             implementRepay(SignedMath.abs(debtChangeBase), mainPrice);
 
         } else if (collateralChangeBase < 0 && debtChangeBase == 0) {
-            // console.log("C00 ==> Just withdraw collateral"); // not found yet
             implementWithdraw(SignedMath.abs(collateralChangeBase), oracle.getAssetPrice(address(stableToken)));
 
         } else if (collateralChangeBase > 0 && debtChangeBase == 0) {
-            // console.log("C00 ==> Just supply collateral"); // not found yet
             implementSupply(SignedMath.abs(collateralChangeBase), mainPrice);
 
         } else {

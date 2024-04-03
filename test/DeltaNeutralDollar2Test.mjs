@@ -209,11 +209,6 @@ describe("DeltaNeutralDollar2", function() {
     mainTokenPrice = await aaveOracle.getAssetPrice(await mainToken.getAddress());
     stableTokenPrice = await aaveOracle.getAssetPrice(await stableToken.getAddress());
 
-    await Promise.all([
-      getMainToken(swapHelper, 10n * ONE_ETHER),
-      getStableToken(swapHelper, 10000n * 10n ** 6n),
-    ]);
-
     let balancerVaultAddress = BALANCER_VAULT;
 
     if (currentChain == CHAIN_LOCAL) {

@@ -36,16 +36,32 @@ npx hardhat vars set PRIVATE_KEY your private key
 
 # Testing
 
-Fork Arbitrum One or Optimism:
+Note: make sure `PRIVATE_KEY` hardhat var is **unset** for testing.
+
+Main contract testing:
+
+```bash
+npx hardhat test test/DeltaNeutralDollar2Test.mjs
+```
+
+To test on network fork:
 
 ```bash
 npx hardhat node --fork https://arbitrum-mainnet.infura.io/v3/YOUR_API_KEY
 ```
 
-Then run test:
+Here comes a tricky part. Typically to run the test you'd do it as follows:
 
 ```bash
 npx hardhat --network forked test test/DeltaNeutralDollar2Test.mjs
+```
+
+**However:** right now (April 2024) on Arbitrum fork the test will only pass if you run just a few test cases at a
+time using `it.only()` or `it.skip()`. This sucks immensely and hopefully this will be fixed in upcoming hardhat releases.
+
+Other tests pass just fine:
+
+```bash
 npx hardhat --network forked test test/CollectorTest.mjs
 ```
 

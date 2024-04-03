@@ -160,7 +160,7 @@ describe("DeltaNeutralDollar2", function() {
       await aaveOracle.setOverridePrice(await mainToken.getAddress(), 2000n * 10n**8n);
       await aaveOracle.setOverridePrice(await stableToken.getAddress(), 99999000);
 
-      const SwapHelper = await ethers.getContractFactory('SwapHelperEmulator');
+      const SwapHelper = await ethers.getContractFactory('SwapHelperEmulatorMintBurn');
       swapHelper = await SwapHelper.deploy(await mainToken.getAddress(), await aaveOracle.getAddress());
       await swapHelper.waitForDeployment();
 

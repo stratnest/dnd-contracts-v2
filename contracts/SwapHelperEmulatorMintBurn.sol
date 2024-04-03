@@ -7,7 +7,7 @@ import { TestToken } from "./TestToken.sol";
 
 import "./ISwapHelper.sol";
 
-contract SwapHelperEmulator is ISwapHelper {
+contract SwapHelperEmulatorMintBurn is ISwapHelper {
     address private ethToken;
     address private aaveOracle;
 

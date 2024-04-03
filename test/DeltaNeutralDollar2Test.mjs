@@ -160,6 +160,10 @@ describe("DeltaNeutralDollar2", function() {
       await aaveOracle.setOverridePrice(await mainToken.getAddress(), 2000n * 10n**8n);
       await aaveOracle.setOverridePrice(await stableToken.getAddress(), 99999000);
 
+      const SwapHelper = await ethers.getContractFactory('SwapHelperEmulator');
+      swapHelper = await SwapHelper.deploy(await mainToken.getAddress(), await aaveOracle.getAddress());
+      await swapHelper.waitForDeployment();
+
     } else {
       stableToken = await ethers.getContractAt('IERC20Metadata', stableTokenAddress);
       stableToken.address = await stableToken.getAddress();
@@ -180,14 +184,15 @@ describe("DeltaNeutralDollar2", function() {
       await addressProvider.connect(impersonatorOwner).setPriceOracle(await aaveOracle.getAddress());
 
       await aaveOracle.setOverridePrice(await mainToken.getAddress(), 2000n * 10n**8n);
+
+      // FIXME support other networks as well
+      const SwapHelper = await ethers.getContractFactory('SwapHelperArbitrumOne');
+      swapHelper = await SwapHelper.deploy();
+      await swapHelper.waitForDeployment();
     }
 
     mainTokenPrice = await aaveOracle.getAssetPrice(await mainToken.getAddress());
     stableTokenPrice = await aaveOracle.getAssetPrice(await stableToken.getAddress());
-
-    const SwapHelper = await ethers.getContractFactory('SwapHelperEmulator');
-    swapHelper = await SwapHelper.deploy(await mainToken.getAddress(), await aaveOracle.getAddress()),
-    await swapHelper.waitForDeployment();
 
     await Promise.all([
       getMainToken(swapHelper, 10n * ONE_ETHER),

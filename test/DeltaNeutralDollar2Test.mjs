@@ -19,6 +19,11 @@ const WSTETH_ARBITRUM = '0x5979D7b546E38E414F7E9822514be443A4800529';
 const WSTETH_POLYGON = '0x03b54A6e9a984069379fae1a4fC4dBAE93B3bCCD';
 const CBETH_BASE = '0x2Ae3F1Ec7F1F5012CFEab0185bfc7aa3cf0DEc22';
 
+const WETH_OPTIMISM = '0x4200000000000000000000000000000000000006';
+const WETH_ARBITRUM = '0x82aF49447D8a07e3bd95BD0d56f35241523fBab1';
+const WETH_POLYGON = '0x7ceB23fD6bC0adD59E62ac25578270cFf1b9f619';
+const WETH_BASE = '0x4200000000000000000000000000000000000006';
+
 const USDC_OPTIMISM = '0x7F5c764cBc14f9669B88837ca1490cCa17c31607';
 const USDCE_ARBITRUM = '0xFF970A61A04b1cA14834A43f5dE4533eBDDB5CC8';
 const USDC_POLYGON = '0x2791Bca1f2de4661ED88A30C99A7a9449Aa84174';
@@ -62,7 +67,7 @@ describe("DeltaNeutralDollar2", function() {
   let mainTokenPrice;
   let stableTokenPrice;
 
-  let wstethVariableDebtToken;
+  let wethTokenAddress;
   let usdcAToken;
 
   async function detectChain() {
@@ -78,6 +83,7 @@ describe("DeltaNeutralDollar2", function() {
       mainTokenAddress = WSTETH_OPTIMISM;
       stableTokenAddress = USDC_OPTIMISM;
       aaveAddressesProvider = AAVE_ADDRESSES_PROVIDER_OPTIMISM_ARBITRUM_POLYGON;
+      wethTokenAddress = WETH_OPTIMISM;
       return;
     }
 
@@ -86,6 +92,7 @@ describe("DeltaNeutralDollar2", function() {
       mainTokenAddress = WSTETH_ARBITRUM;
       stableTokenAddress = USDCE_ARBITRUM;
       aaveAddressesProvider = AAVE_ADDRESSES_PROVIDER_OPTIMISM_ARBITRUM_POLYGON;
+      wethTokenAddress = WETH_ARBITRUM;
       return;
     }
 
@@ -94,6 +101,7 @@ describe("DeltaNeutralDollar2", function() {
       mainTokenAddress = CBETH_BASE;
       stableTokenAddress = USDBC_BASE;
       aaveAddressesProvider = AAVE_ADDRESSES_PROVIDER_BASE;
+      wethTokenAddress = WETH_BASE;
       return;
     }
 
@@ -102,6 +110,7 @@ describe("DeltaNeutralDollar2", function() {
       mainTokenAddress = WSTETH_POLYGON;
       stableTokenAddress = USDC_POLYGON;
       aaveAddressesProvider = AAVE_ADDRESSES_PROVIDER_OPTIMISM_ARBITRUM_POLYGON;
+      wethTokenAddress = WETH_POLYGON;
     }
 
     currentChain = CHAIN_LOCAL;
@@ -116,7 +125,11 @@ describe("DeltaNeutralDollar2", function() {
     [ myAccount, secondAccount, ownerAccount, liquidatorAccount ] = await hre.ethers.getSigners();
 
     const DeltaNeutralDollar = await ethers.getContractFactory('DeltaNeutralDollar2');
+    // to test proxies:
     deltaNeutralDollar = await upgrades.deployProxy(DeltaNeutralDollar, [], { initializer: false, kind: 'uups' });
+
+    // to test direct deployment
+    // deltaNeutralDollar = await DeltaNeutralDollar.deploy();
 
     let addressProvider;
 
@@ -183,12 +196,14 @@ describe("DeltaNeutralDollar2", function() {
       await setBalance(await impersonatorOwner.getAddress(), ONE_ETHER);
       await addressProvider.connect(impersonatorOwner).setPriceOracle(await aaveOracle.getAddress());
 
-      await aaveOracle.setOverridePrice(await mainToken.getAddress(), 2000n * 10n**8n);
+      await aaveOracle.setOverridePrice(await mainToken.getAddress(), 2000n * 10n ** 8n);
 
-      // FIXME support other networks as well
-      const SwapHelper = await ethers.getContractFactory('SwapHelperArbitrumOne');
-      swapHelper = await SwapHelper.deploy();
+      const SwapHelper = await ethers.getContractFactory('SwapHelperEmulatorCustodian');
+      swapHelper = await SwapHelper.deploy(await mainToken.getAddress(), wethTokenAddress, await addressProvider.getAddress());
       await swapHelper.waitForDeployment();
+
+      await getMainToken(swapHelper, ONE_ETHER * 20n);
+      await getStableToken(swapHelper, 1_000_000n * 10n ** 6n);
     }
 
     mainTokenPrice = await aaveOracle.getAssetPrice(await mainToken.getAddress());

@@ -206,7 +206,7 @@ contract DeltaNeutralDollar2 is ERC20Upgradeable, OwnableUpgradeable, UUPSUpgrad
             }
 
             collateralWithdraw(type(uint).max);
-            swap(stableToken, mainToken, stableToken.balanceOf(address(this)));
+            swapStableToMain(stableToken.balanceOf(address(this)));
 
         } else {
             uint256 flashLoanMain = debtMain - balanceMain; // there is no underflow risk as it has been checked in the "if" above
@@ -247,9 +247,8 @@ contract DeltaNeutralDollar2 is ERC20Upgradeable, OwnableUpgradeable, UUPSUpgrad
         uint256 balanceBase = convertMainToBase(mainToken.balanceOf(address(this)), mainPrice);
         uint256 totalAssetsBase = totalCollateralBase - totalDebtBase + balanceBase;
 
-        // uint256 idealTotalCollateralBase = Math.mulDiv(totalAssetsBase, settings.positionSizePercent, 100); // FIXME remove once tested
-        // uint256 idealTotalCollateralBase = Math.mulDiv(totalAssetsBase, 999, 1000); // shave 0.1% to give room
-
+        // FIXME remove once tested
+        // uint256 idealTotalCollateralBase = Math.mulDiv(totalAssetsBase, 990, 1000); // shave 0.1% to give room
         uint256 idealTotalCollateralBase = totalAssetsBase;
 
         // positive means supply; negative: withdraw
@@ -344,7 +343,7 @@ contract DeltaNeutralDollar2 is ERC20Upgradeable, OwnableUpgradeable, UUPSUpgrad
 
     function implementSupply(uint256 supplyCollateralBase, uint256 mainPrice) internal {
         uint256 collateralMain = convertBaseToMain(supplyCollateralBase, mainPrice);
-        uint256 collateralStable = swap(mainToken, stableToken, collateralMain);
+        uint256 collateralStable = swapMainToStable(collateralMain);
         collateralSupply(collateralStable);
     }
 
@@ -378,7 +377,7 @@ contract DeltaNeutralDollar2 is ERC20Upgradeable, OwnableUpgradeable, UUPSUpgrad
         // aave amount is divisable by 5. But we keep this sanity check anyway.
         assert(collateralMain > 0);
 
-        uint256 collateralStable = swap(mainToken, stableToken, collateralMain);
+        uint256 collateralStable = swapMainToStable(collateralMain);
         assert(collateralStable > 0);
 
         uint256 positionStable = collateralStable * 5;
@@ -399,7 +398,7 @@ contract DeltaNeutralDollar2 is ERC20Upgradeable, OwnableUpgradeable, UUPSUpgrad
         uint256 withdrawCollateralStable = convertBaseToStable(withdrawCollateralBase, stablePrice);
         assert(withdrawCollateralStable > 0);
         collateralWithdraw(withdrawCollateralStable);
-        swap(stableToken, mainToken, withdrawCollateralStable);
+        swapStableToMain(withdrawCollateralStable);
     }
 
     function receiveFlashLoanRebalanceSupplyAndBorrow(uint256 flashLoanStable, uint256 positionStable, uint256 borrowDebtMain) internal {
@@ -414,8 +413,10 @@ contract DeltaNeutralDollar2 is ERC20Upgradeable, OwnableUpgradeable, UUPSUpgrad
         uint256 feeMain = ISwapHelper(swapHelper).calcSwapFee(address(mainToken), address(stableToken), mainToSwap);
         mainToSwap = mainToSwap + feeMain;
 
-        // at this point we assume we always have enough main token to cover swap fees
-        swap(mainToken, stableToken, mainToSwap);
+        // There might be a huge price difference between Aave Oracle and Uniswap, so we add 1% to the amount to swap on Uniswap
+        // to make sure we have spent enough to cover the flash loan. Unused funds will be returned to the contract
+        // by the swap helper.
+        swapMainToExactStable(Math.mulDiv(mainToSwap, 101, 100), flashLoanStable); // 1% slack
 
         assert(stableToken.balanceOf(address(this)) >= flashLoanStable);
 
@@ -423,7 +424,7 @@ contract DeltaNeutralDollar2 is ERC20Upgradeable, OwnableUpgradeable, UUPSUpgrad
 
         uint256 dustStable = stableToken.balanceOf(address(this));
         if (dustStable > 0) {
-            swap(stableToken, mainToken, dustStable);
+            swapStableToMain(dustStable);
         }
     }
 
@@ -434,7 +435,7 @@ contract DeltaNeutralDollar2 is ERC20Upgradeable, OwnableUpgradeable, UUPSUpgrad
 
         collateralWithdraw(type(uint).max);
 
-        swap(stableToken, mainToken, stableToken.balanceOf(address(this)));
+        swapStableToMain(stableToken.balanceOf(address(this)));
 
         mainToken.transfer(balancerVault, flashLoanMain);
     }
@@ -447,7 +448,7 @@ contract DeltaNeutralDollar2 is ERC20Upgradeable, OwnableUpgradeable, UUPSUpgrad
 
         collateralWithdraw(withdrawCollateralStable);
 
-        swap(stableToken, mainToken, withdrawCollateralStable);
+        swapStableToMain(withdrawCollateralStable);
 
         mainToken.transfer(balancerVault, flashLoanMain);
     }
@@ -605,8 +606,16 @@ contract DeltaNeutralDollar2 is ERC20Upgradeable, OwnableUpgradeable, UUPSUpgrad
         pool.withdraw(address(stableToken), amount, address(this));
     }
 
-    function swap(IERC20 from, IERC20 to, uint256 amount) internal returns (uint256 swappedAmount) {
-        swappedAmount = ISwapHelper(swapHelper).swap(address(from), address(to), amount);
+    function swapMainToStable(uint256 amount) internal returns (uint256) {
+        return ISwapHelper(swapHelper).swapExactInput(address(mainToken), address(stableToken), amount);
+    }
+
+    function swapStableToMain(uint256 amount) internal returns (uint256) {
+        return ISwapHelper(swapHelper).swapExactInput(address(stableToken), address(mainToken), amount);
+    }
+
+    function swapMainToExactStable(uint256 amountInMaximum, uint256 amountOut) internal returns (uint256 amountIn) {
+        return ISwapHelper(swapHelper).swapExactOutput(address(mainToken), address(stableToken), amountOut, amountInMaximum);
     }
 
     function doFlashLoan(address token, uint256 amount, bytes memory userData) internal {

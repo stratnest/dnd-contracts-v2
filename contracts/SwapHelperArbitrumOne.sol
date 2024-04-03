@@ -1,10 +1,11 @@
 // SPDX-License-Identifier: Unlicensed
 pragma solidity ^0.8.0;
 
-import "@uniswap/v3-periphery/contracts/interfaces/ISwapRouter.sol";
+import { Math } from "@openzeppelin/contracts/utils/math/Math.sol";
+import { ISwapRouter } from "@uniswap/v3-periphery/contracts/interfaces/ISwapRouter.sol";
 import { IERC20 } from "@openzeppelin/contracts/interfaces/IERC20.sol";
 
-import "./ISwapHelper.sol";
+import { ISwapHelper } from "./ISwapHelper.sol";
 
 address constant USDCE = 0xFF970A61A04b1cA14834A43f5dE4533eBDDB5CC8;
 address constant WSTETH = 0x5979D7b546E38E414F7E9822514be443A4800529;
@@ -19,23 +20,23 @@ contract SwapHelperArbitrumOne is ISwapHelper {
         override
         returns (uint256)
     {
-        return amount * 3 / 1000;
+        return Math.mulDiv(amount, 6, 10000);
     }
 
-    function swap(address from, address to, uint256 amount)
+    function swapExactInput(address from, address to, uint256 amountIn)
         public
         override
         returns (uint256)
     {
-        IERC20(from).transferFrom(msg.sender, address(this), amount);
-        IERC20(from).approve(ROUTER, amount);
+        IERC20(from).transferFrom(msg.sender, address(this), amountIn);
+        IERC20(from).approve(ROUTER, amountIn);
 
         if (from == USDCE && to == WSTETH) {
             ISwapRouter.ExactInputParams memory params = ISwapRouter.ExactInputParams({
                 path: abi.encodePacked(USDCE, uint24(500), WETH, uint24(100), WSTETH),
                 recipient: msg.sender,
                 deadline: block.timestamp,
-                amountIn: amount,
+                amountIn: amountIn,
                 amountOutMinimum: 0
             });
 
@@ -46,7 +47,7 @@ contract SwapHelperArbitrumOne is ISwapHelper {
                 path: abi.encodePacked(WSTETH, uint24(100), WETH, uint24(500), USDCE),
                 recipient: msg.sender,
                 deadline: block.timestamp,
-                amountIn: amount,
+                amountIn: amountIn,
                 amountOutMinimum: 0
             });
 
@@ -54,5 +55,42 @@ contract SwapHelperArbitrumOne is ISwapHelper {
         }
 
         revert("SWAP ROUTE?");
+    }
+
+    function swapExactOutput(address from, address to, uint256 amountOut, uint256 amountInMaximum)
+        external
+        override
+        returns (uint256)
+    {
+        uint256 balanceBefore = IERC20(from).balanceOf(msg.sender);
+        IERC20(from).transferFrom(msg.sender, address(this), balanceBefore);
+        IERC20(from).approve(ROUTER, balanceBefore);
+
+        bytes memory path;
+
+        if (to == WSTETH) {
+            path = abi.encodePacked(WSTETH, uint24(100), WETH, uint24(500), USDCE);
+
+        } else if (from == WSTETH) {
+            path = abi.encodePacked(USDCE, uint24(500), WETH, uint24(100), WSTETH);
+
+        } else {
+            revert("SWAP ROUTE?");
+        }
+
+        ISwapRouter.ExactOutputParams memory params = ISwapRouter.ExactOutputParams({
+            path: path,
+            recipient: msg.sender,
+            deadline: block.timestamp,
+            amountOut: amountOut,
+            amountInMaximum: amountInMaximum
+        });
+
+        uint256 swappedAmount = ISwapRouter(ROUTER).exactOutput(params);
+
+        IERC20(from).transfer(msg.sender, balanceBefore - swappedAmount);
+        IERC20(from).approve(ROUTER, 0);
+
+        return swappedAmount;
     }
 }

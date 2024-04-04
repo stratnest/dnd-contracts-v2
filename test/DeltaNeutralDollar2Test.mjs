@@ -38,16 +38,6 @@ const CHAIN_LOCAL = 'local';
 const FLAGS_DEPOSIT_PAUSED  = 1 << 1;
 const FLAGS_WITHDRAW_PAUSED = 1 << 2;
 
-const ERROR_OPERATION_DISABLED_BY_FLAGS = 'DND-01';
-const ERROR_ONLY_FLASHLOAN_LENDER = 'DND-02';
-const ERROR_INCORRECT_FLASHLOAN_TOKEN_RECEIVED = 'DND-03';
-const ERROR_UNKNOWN_FLASHLOAN_MODE = 'DND-04';
-const ERROR_INCORRECT_DEPOSIT_OR_WITHDRAWAL_AMOUNT = 'DND-05';
-const ERROR_CONTRACT_NOT_READY_FOR_WITHDRAWAL = 'DND-06';
-const ERROR_POSITION_CLOSED = 'DND-07';
-const ERROR_POSITION_UNCHANGED = 'DND-08';
-const ERROR_IMPOSSIBLE_MODE = 'DND-09';
-
 describe("DeltaNeutralDollar2", function() {
   let snapshot, initialSnapshot;
 
@@ -610,7 +600,7 @@ describe("DeltaNeutralDollar2", function() {
     const secondBalanceBefore = await deltaNeutralDollar.balanceOf(secondAccount.address);
     expect(secondBalanceBefore).to.be.withinPercent(mainTokenPrice, 1.1);
 
-    await expect(deltaNeutralDollar.withdraw(1000000000)).to.be.revertedWith(ERROR_INCORRECT_DEPOSIT_OR_WITHDRAWAL_AMOUNT);
+    await expect(deltaNeutralDollar.withdraw(1000000000)).to.be.revertedWithCustomError(deltaNeutralDollar, "DNDIncorrectDepositOrWithdrawalAmount");
 
     await deltaNeutralDollar.connect(secondAccount).withdraw(secondBalanceBefore / 2n);
 
@@ -620,7 +610,7 @@ describe("DeltaNeutralDollar2", function() {
   it("withdraw more than balance", async () => {
     await deltaNeutralDollar.deposit(ONE_ETHER);
     const myBalance = await deltaNeutralDollar.balanceOf(myAccount.address);
-    await expect(deltaNeutralDollar.withdraw(myBalance + 1n)).to.be.revertedWith(ERROR_INCORRECT_DEPOSIT_OR_WITHDRAWAL_AMOUNT);
+    await expect(deltaNeutralDollar.withdraw(myBalance + 1n)).to.be.revertedWithCustomError(deltaNeutralDollar, "DNDIncorrectDepositOrWithdrawalAmount");
   });
 
   it("only owner can close position", async () => {
@@ -648,8 +638,8 @@ describe("DeltaNeutralDollar2", function() {
 
   it("caps are respected", async () => {
     await getMainToken(myAccount, ONE_ETHER * 3n + 1n);
-    await expect(deltaNeutralDollar.deposit(ONE_ETHER * 3n + 1n)).to.be.revertedWith(ERROR_INCORRECT_DEPOSIT_OR_WITHDRAWAL_AMOUNT);
-    await expect(deltaNeutralDollar.deposit(1n)).to.be.revertedWith(ERROR_INCORRECT_DEPOSIT_OR_WITHDRAWAL_AMOUNT);
+    await expect(deltaNeutralDollar.deposit(ONE_ETHER * 3n + 1n)).to.be.revertedWithCustomError(deltaNeutralDollar, "DNDIncorrectDepositOrWithdrawalAmount");
+    await expect(deltaNeutralDollar.deposit(1n)).to.be.revertedWithCustomError(deltaNeutralDollar, "DNDIncorrectDepositOrWithdrawalAmount");
   });
 
   it("cannot deposit when flags disabled", async () => {
@@ -664,7 +654,7 @@ describe("DeltaNeutralDollar2", function() {
       10
     );
 
-    await expect(deltaNeutralDollar.deposit(ONE_ETHER / 2n)).to.be.revertedWith(ERROR_OPERATION_DISABLED_BY_FLAGS);
+    await expect(deltaNeutralDollar.deposit(ONE_ETHER / 2n)).to.be.revertedWithCustomError(deltaNeutralDollar, 'DNDOperationDisabledByFlags');
 
     await deltaNeutralDollar.withdraw(await deltaNeutralDollar.balanceOf(myAccount.address) / 2n); // withdraw still allowed
   });
@@ -681,7 +671,7 @@ describe("DeltaNeutralDollar2", function() {
       10
     );
 
-    await expect(deltaNeutralDollar.withdraw(100)).to.be.revertedWith(ERROR_OPERATION_DISABLED_BY_FLAGS);
+    await expect(deltaNeutralDollar.withdraw(100)).to.be.revertedWithCustomError(deltaNeutralDollar, "DNDOperationDisabledByFlags");
 
     await deltaNeutralDollar.deposit(ONE_ETHER / 2n); // deposit still allowed
   });
@@ -718,7 +708,7 @@ describe("DeltaNeutralDollar2", function() {
   it("disallow deposit after close position", async () => {
     await deltaNeutralDollar.deposit(ONE_ETHER);
     await deltaNeutralDollar.connect(ownerAccount).closePosition();
-    await expect(deltaNeutralDollar.deposit(ONE_ETHER)).to.be.revertedWith(ERROR_OPERATION_DISABLED_BY_FLAGS);
+    await expect(deltaNeutralDollar.deposit(ONE_ETHER)).to.be.revertedWithCustomError(deltaNeutralDollar, "DNDOperationDisabledByFlags");
   });
 
   it("eth price down then close position", async () => {
@@ -959,6 +949,6 @@ describe("DeltaNeutralDollar2", function() {
     const feeAmounts = [ 0 ];
     const userData = ethers.encodeBytes32String('');
 
-    await expect(deltaNeutralDollar.receiveFlashLoan(tokens, amounts, feeAmounts, userData)).to.be.revertedWith(ERROR_ONLY_FLASHLOAN_LENDER);
+    await expect(deltaNeutralDollar.receiveFlashLoan(tokens, amounts, feeAmounts, userData)).to.be.revertedWithCustomError(deltaNeutralDollar, 'DNDOnlyFlashloanLender');
   });
 });

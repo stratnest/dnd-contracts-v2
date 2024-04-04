@@ -36,15 +36,15 @@ uint256 constant EXTRACT_LTV_FROM_POOL_CONFIGURATION_DATA_MASK = (1 << 16) - 1;
 
 uint256 constant MIN_DND_AMOUNT_TO_WITHDRAW = 10 ** 8; // roughly one dollar
 
-string constant ERROR_OPERATION_DISABLED_BY_FLAGS = "DND-01";
-string constant ERROR_ONLY_FLASHLOAN_LENDER = "DND-02";
-string constant ERROR_INCORRECT_FLASHLOAN_TOKEN_RECEIVED = "DND-03";
-string constant ERROR_UNKNOWN_FLASHLOAN_MODE = "DND-04";
-string constant ERROR_INCORRECT_DEPOSIT_OR_WITHDRAWAL_AMOUNT = "DND-05";
-string constant ERROR_CONTRACT_NOT_READY_FOR_WITHDRAWAL = "DND-06";
-string constant ERROR_POSITION_CLOSED = "DND-07";
-string constant ERROR_POSITION_UNCHANGED = "DND-08";
-string constant ERROR_IMPOSSIBLE_MODE = "DND-09";
+error DNDOperationDisabledByFlags();
+error DNDOnlyFlashloanLender();
+error DNDUnknownFlashloanMode();
+error DNDIncorrectFlashloanTokenReceived();
+error DNDIncorrectDepositOrWithdrawalAmount();
+error DNDContractNotReadyForWithdrawal();
+error DNDPositionClosed();
+error DNDPositionUnchanged();
+error DNDImpossibleMode();
 
 /// @title Delta-neutral dollar vault
 
@@ -75,7 +75,7 @@ contract DeltaNeutralDollar2 is ERC20Upgradeable, OwnableUpgradeable, UUPSUpgrad
 
     IPoolAddressesProvider private aaveAddressProvider;
 
-    address private balancerVault; // FIXME remove types?
+    address private balancerVault;
 
     IPool private pool;
     IAaveOracle private oracle;
@@ -168,17 +168,20 @@ contract DeltaNeutralDollar2 is ERC20Upgradeable, OwnableUpgradeable, UUPSUpgrad
         stableToken.approve(address(pool), 2 ** 256 - 1);
     }
 
-    // FIXME move to custom errors?
-
     function _authorizeUpgrade(address) internal override onlyOwner {}
 
     modifier whenFlagNotSet(uint8 whatExactly) {
-        require((flags & whatExactly) != whatExactly, ERROR_OPERATION_DISABLED_BY_FLAGS);
+        if ((flags & whatExactly) == whatExactly) {
+            revert DNDOperationDisabledByFlags();
+        }
+
         _;
     }
 
     modifier onlyBalancerVault() {
-        require(msg.sender == balancerVault, ERROR_ONLY_FLASHLOAN_LENDER);
+        if (msg.sender != balancerVault) {
+            revert DNDOnlyFlashloanLender();
+        }
         _;
     }
 
@@ -247,7 +250,7 @@ contract DeltaNeutralDollar2 is ERC20Upgradeable, OwnableUpgradeable, UUPSUpgrad
         uint256 balanceBase = convertMainToBase(mainToken.balanceOf(address(this)), mainPrice);
         uint256 totalAssetsBase = totalCollateralBase - totalDebtBase + balanceBase;
 
-        // FIXME remove once tested
+        // The amount could be shaved a bit here to give a leeway. This code is not used but kept as a reference.
         // uint256 idealTotalCollateralBase = Math.mulDiv(totalAssetsBase, 990, 1000); // shave 0.1% to give room
         uint256 idealTotalCollateralBase = totalAssetsBase;
 
@@ -272,7 +275,7 @@ contract DeltaNeutralDollar2 is ERC20Upgradeable, OwnableUpgradeable, UUPSUpgrad
     }
 
     /// @notice Do `calculateRequiredPositionChange()` and actually rebalance the position if changes are pending.
-    /// This method reverts with `ERROR_POSITION_UNCHANGED` if the position stays the same or if the changes are too small
+    /// This method reverts with `DNDPositionUnchanged()` if the position stays the same or if the changes are too small
     /// and not worth executing.
     function rebalance() public {
         _rebalance(true);
@@ -281,7 +284,7 @@ contract DeltaNeutralDollar2 is ERC20Upgradeable, OwnableUpgradeable, UUPSUpgrad
     function _rebalance(bool shouldRevert) internal {
         if (flags & FLAGS_POSITION_CLOSED == FLAGS_POSITION_CLOSED) {
             if (shouldRevert) {
-                revert(ERROR_POSITION_CLOSED);
+                revert DNDPositionClosed();
             }
 
             return;
@@ -294,7 +297,7 @@ contract DeltaNeutralDollar2 is ERC20Upgradeable, OwnableUpgradeable, UUPSUpgrad
 
         if (collateralChangeBase == 0 && debtChangeBase == 0) {
             if (shouldRevert) {
-                revert(ERROR_POSITION_UNCHANGED);
+                revert DNDPositionUnchanged();
             }
 
             return;
@@ -327,7 +330,7 @@ contract DeltaNeutralDollar2 is ERC20Upgradeable, OwnableUpgradeable, UUPSUpgrad
             implementSupply(SignedMath.abs(collateralChangeBase), mainPrice);
 
         } else {
-            revert(ERROR_IMPOSSIBLE_MODE);
+            revert DNDImpossibleMode();
         }
 
         (totalCollateralBase, totalDebtBase, , , , ) = pool.getUserAccountData(address(this));
@@ -465,26 +468,35 @@ contract DeltaNeutralDollar2 is ERC20Upgradeable, OwnableUpgradeable, UUPSUpgrad
         (uint8 mode) = abi.decode(userData, (uint8));
 
         if (mode == FLASH_LOAN_MODE_REBALANCE_SUPPLY_AND_BORROW) {
-            require(tokens.length == 1 && tokens[0] == address(stableToken), ERROR_INCORRECT_FLASHLOAN_TOKEN_RECEIVED);
+            if (tokens.length != 1 || tokens[0] != address(stableToken)) {
+                revert DNDIncorrectFlashloanTokenReceived();
+            }
+
             (, uint256 borrowDebtMain, uint256 positionStable) = abi.decode(userData, (uint8, uint256, uint256));
             receiveFlashLoanRebalanceSupplyAndBorrow(amounts[0], positionStable, borrowDebtMain);
             return;
         }
 
         if (mode == FLASH_LOAN_MODE_CLOSE_POSITION) {
-            require(tokens.length == 1 && tokens[0] == address(mainToken), ERROR_INCORRECT_FLASHLOAN_TOKEN_RECEIVED);
+            if (tokens.length != 1 || tokens[0] != address(mainToken)) {
+                revert DNDIncorrectFlashloanTokenReceived();
+            }
+
             receiveFlashLoanClosePosition(amounts[0]);
             return;
         }
 
         if (mode == FLASH_LOAN_MODE_REBALANCE_REPAY_THEN_WITHDRAW) {
-            require(tokens.length == 1 && tokens[0] == address(mainToken), ERROR_INCORRECT_FLASHLOAN_TOKEN_RECEIVED);
+            if (tokens.length != 1 || tokens[0] != address(mainToken)) {
+                revert DNDIncorrectFlashloanTokenReceived();
+            }
+
             (, uint256 repayDebtMain, uint256 withdrawCollateralBase) = abi.decode(userData, (uint8, uint256, uint256));
             receiveFlashLoanRepayThenWithdraw(amounts[0], repayDebtMain, withdrawCollateralBase);
             return;
         }
 
-        revert(ERROR_UNKNOWN_FLASHLOAN_MODE);
+        revert DNDUnknownFlashloanMode();
     }
 
     /// @notice Allows the contract owner to recover misplaced tokens.
@@ -508,16 +520,13 @@ contract DeltaNeutralDollar2 is ERC20Upgradeable, OwnableUpgradeable, UUPSUpgrad
         whenFlagNotSet(FLAGS_DEPOSIT_PAUSED)
         whenFlagNotSet(FLAGS_POSITION_CLOSED)
     {
-        require(amount > 0, ERROR_INCORRECT_DEPOSIT_OR_WITHDRAWAL_AMOUNT);
+        if (amount == 0 || amount < minDepositAmount || amount > maxDepositAmount) {
+            revert DNDIncorrectDepositOrWithdrawalAmount();
+        }
 
         uint256 totalBalanceBaseBefore = totalBalanceBase();
 
         mainToken.transferFrom(msg.sender, address(this), amount);
-
-        require(
-            amount >= minDepositAmount && amount <= maxDepositAmount,
-            ERROR_INCORRECT_DEPOSIT_OR_WITHDRAWAL_AMOUNT
-        );
 
         _rebalance(false);
 
@@ -540,10 +549,9 @@ contract DeltaNeutralDollar2 is ERC20Upgradeable, OwnableUpgradeable, UUPSUpgrad
     }
 
     function _calculateMainWithdrawAmount(uint256 amount) internal view returns (uint256 amountMain, uint256 amountBase) {
-        require(
-            amount >= MIN_DND_AMOUNT_TO_WITHDRAW && amount <= balanceOf(msg.sender),
-            ERROR_INCORRECT_DEPOSIT_OR_WITHDRAWAL_AMOUNT
-        );
+        if (amount < MIN_DND_AMOUNT_TO_WITHDRAW || amount > balanceOf(msg.sender)) {
+            revert DNDIncorrectDepositOrWithdrawalAmount();
+        }
 
         uint256 percent = Math.mulDiv(amount, 10e18, totalSupply());
         assert(percent > 0);
@@ -555,7 +563,9 @@ contract DeltaNeutralDollar2 is ERC20Upgradeable, OwnableUpgradeable, UUPSUpgrad
         amountMain = convertBaseToMain(amountBase, mainPrice);
         assert(amountMain > 0);
 
-        require(amountMain <= mainToken.balanceOf(address(this)), ERROR_CONTRACT_NOT_READY_FOR_WITHDRAWAL);
+        if (amountMain > mainToken.balanceOf(address(this))) {
+            revert DNDContractNotReadyForWithdrawal();
+        }
     }
 
     /// @notice Withdraw from vault

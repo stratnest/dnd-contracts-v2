@@ -77,9 +77,6 @@ contract DeltaNeutralDollar2 is ERC20Upgradeable, OwnableUpgradeable, UUPSUpgrad
 
     address private balancerVault;
 
-    IPool private pool;
-    IAaveOracle private oracle;
-
     /// @notice Address of the stable token used as collateral in Aave by this contract.
     IERC20 public stableToken;
 
@@ -153,9 +150,6 @@ contract DeltaNeutralDollar2 is ERC20Upgradeable, OwnableUpgradeable, UUPSUpgrad
 
         aaveAddressProvider = IPoolAddressesProvider(_aaveAddressProvider);
 
-        pool = IPool(aaveAddressProvider.getPool()); // FIXME change back to calls, because what are we trying to save here really
-        oracle = IAaveOracle(aaveAddressProvider.getPriceOracle());
-
         balancerVault = _balancerVault;
 
         mainToken = IERC20(_mainToken);
@@ -164,8 +158,8 @@ contract DeltaNeutralDollar2 is ERC20Upgradeable, OwnableUpgradeable, UUPSUpgrad
         mainTokenDecimals = IERC20Metadata(_mainToken).decimals();
         stableTokenDecimals = IERC20Metadata(_stableToken).decimals();
 
-        mainToken.approve(address(pool), 2 ** 256 - 1);
-        stableToken.approve(address(pool), 2 ** 256 - 1);
+        mainToken.approve(address(pool()), 2 ** 256 - 1);
+        stableToken.approve(address(pool()), 2 ** 256 - 1);
     }
 
     function _authorizeUpgrade(address) internal override onlyOwner {}
@@ -188,7 +182,7 @@ contract DeltaNeutralDollar2 is ERC20Upgradeable, OwnableUpgradeable, UUPSUpgrad
     // this is production version
     function getTotalDebtMain() internal view returns (uint256) {
         if (isMock) {
-            return PoolEmulator(address(pool)).debtBalanceOf(address(this));
+            return PoolEmulator(address(pool())).debtBalanceOf(address(this));
         }
 
         (, , address variableDebtTokenAddress) = IPoolDataProvider(aaveAddressProvider.getPoolDataProvider()).getReserveTokensAddresses(address(mainToken));
@@ -234,8 +228,8 @@ contract DeltaNeutralDollar2 is ERC20Upgradeable, OwnableUpgradeable, UUPSUpgrad
     /// Note: amount is denoted in Aave base currency.
     /// @dev This is a public facing implementation, a read-only method to see if there's any change pending.
     function calculateRequiredPositionChange() public view returns (int256 collateralChangeBase, int256 debtChangeBase) {
-        uint256 mainPrice = oracle.getAssetPrice(address(mainToken));
-        (uint256 totalCollateralBase, uint256 totalDebtBase, , , , ) = pool.getUserAccountData(address(this));
+        uint256 mainPrice = oracle().getAssetPrice(address(mainToken));
+        (uint256 totalCollateralBase, uint256 totalDebtBase, , , , ) = pool().getUserAccountData(address(this));
         return _calculateRequiredPositionChange(totalCollateralBase, totalDebtBase, mainPrice);
     }
 
@@ -290,9 +284,9 @@ contract DeltaNeutralDollar2 is ERC20Upgradeable, OwnableUpgradeable, UUPSUpgrad
             return;
         }
 
-        uint256 mainPrice = oracle.getAssetPrice(address(mainToken));
+        uint256 mainPrice = oracle().getAssetPrice(address(mainToken));
 
-        (uint256 totalCollateralBase, uint256 totalDebtBase, , , , ) = pool.getUserAccountData(address(this));
+        (uint256 totalCollateralBase, uint256 totalDebtBase, , , , ) = pool().getUserAccountData(address(this));
         (int256 collateralChangeBase, int256 debtChangeBase) = _calculateRequiredPositionChange(totalCollateralBase, totalDebtBase, mainPrice);
 
         if (collateralChangeBase == 0 && debtChangeBase == 0) {
@@ -314,7 +308,7 @@ contract DeltaNeutralDollar2 is ERC20Upgradeable, OwnableUpgradeable, UUPSUpgrad
             implementSupply(SignedMath.abs(collateralChangeBase), mainPrice);
 
         } else if (collateralChangeBase < 0 && debtChangeBase > 0) {
-            implementWithdraw(SignedMath.abs(collateralChangeBase), oracle.getAssetPrice(address(stableToken)));
+            implementWithdraw(SignedMath.abs(collateralChangeBase), oracle().getAssetPrice(address(stableToken)));
             implementBorrow(SignedMath.abs(debtChangeBase), mainPrice);
 
         } else if (collateralChangeBase == 0 && debtChangeBase > 0) {
@@ -324,7 +318,7 @@ contract DeltaNeutralDollar2 is ERC20Upgradeable, OwnableUpgradeable, UUPSUpgrad
             implementRepay(SignedMath.abs(debtChangeBase), mainPrice);
 
         } else if (collateralChangeBase < 0 && debtChangeBase == 0) {
-            implementWithdraw(SignedMath.abs(collateralChangeBase), oracle.getAssetPrice(address(stableToken)));
+            implementWithdraw(SignedMath.abs(collateralChangeBase), oracle().getAssetPrice(address(stableToken)));
 
         } else if (collateralChangeBase > 0 && debtChangeBase == 0) {
             implementSupply(SignedMath.abs(collateralChangeBase), mainPrice);
@@ -333,7 +327,7 @@ contract DeltaNeutralDollar2 is ERC20Upgradeable, OwnableUpgradeable, UUPSUpgrad
             revert DNDImpossibleMode();
         }
 
-        (totalCollateralBase, totalDebtBase, , , , ) = pool.getUserAccountData(address(this));
+        (totalCollateralBase, totalDebtBase, , , , ) = pool().getUserAccountData(address(this));
 
         emit PositionChange(
             mainToken.balanceOf(address(this)),
@@ -362,7 +356,7 @@ contract DeltaNeutralDollar2 is ERC20Upgradeable, OwnableUpgradeable, UUPSUpgrad
 
         if (repayDebtMain <= myBalanceMain) {
             implementRepay(repayDebtBase, mainPrice);
-            implementWithdraw(withdrawCollateralBase, oracle.getAssetPrice(address(stableToken)));
+            implementWithdraw(withdrawCollateralBase, oracle().getAssetPrice(address(stableToken)));
             return;
         }
 
@@ -408,8 +402,8 @@ contract DeltaNeutralDollar2 is ERC20Upgradeable, OwnableUpgradeable, UUPSUpgrad
         collateralSupply(positionStable);
         debtBorrow(borrowDebtMain);
 
-        uint256 mainPrice = oracle.getAssetPrice(address(mainToken));
-        uint256 stablePrice = oracle.getAssetPrice(address(stableToken));
+        uint256 mainPrice = oracle().getAssetPrice(address(mainToken));
+        uint256 stablePrice = oracle().getAssetPrice(address(stableToken));
 
         uint256 mainToSwap = convertBaseToMain(convertStableToBase(flashLoanStable, stablePrice), mainPrice);
 
@@ -446,7 +440,7 @@ contract DeltaNeutralDollar2 is ERC20Upgradeable, OwnableUpgradeable, UUPSUpgrad
     function receiveFlashLoanRepayThenWithdraw(uint256 flashLoanMain, uint256 repayDebtMain, uint256 withdrawCollateralBase) internal {
         debtRepay(repayDebtMain);
 
-        uint256 withdrawCollateralStable = convertBaseToStable(withdrawCollateralBase, oracle.getAssetPrice(address(stableToken)));
+        uint256 withdrawCollateralStable = convertBaseToStable(withdrawCollateralBase, oracle().getAssetPrice(address(stableToken)));
         assert(withdrawCollateralStable > 0);
 
         collateralWithdraw(withdrawCollateralStable);
@@ -559,7 +553,7 @@ contract DeltaNeutralDollar2 is ERC20Upgradeable, OwnableUpgradeable, UUPSUpgrad
         amountBase = Math.mulDiv(totalBalanceBase(), percent, 10e18);
         assert(amountBase > 0);
 
-        uint256 mainPrice = oracle.getAssetPrice(address(mainToken));
+        uint256 mainPrice = oracle().getAssetPrice(address(mainToken));
         amountMain = convertBaseToMain(amountBase, mainPrice);
         assert(amountMain > 0);
 
@@ -587,33 +581,33 @@ contract DeltaNeutralDollar2 is ERC20Upgradeable, OwnableUpgradeable, UUPSUpgrad
     /// @notice Returns the Total Value Locked (TVL) in the Vault
     /// @return The TVL represented in Aave's base currency
     function totalBalanceBase() public view returns (uint256) {
-        (uint256 totalCollateralBase, uint256 totalDebtBase, , , ,) = pool.getUserAccountData(address(this));
+        (uint256 totalCollateralBase, uint256 totalDebtBase, , , ,) = pool().getUserAccountData(address(this));
         uint256 netBase = totalCollateralBase - totalDebtBase;
 
-        uint256 mainPrice = oracle.getAssetPrice(address(mainToken));
+        uint256 mainPrice = oracle().getAssetPrice(address(mainToken));
         uint256 mainBalanceBase = Math.mulDiv(mainToken.balanceOf(address(this)), mainPrice, 10 ** mainTokenDecimals);
 
         return mainBalanceBase + netBase;
     }
 
     function debtBorrow(uint256 amount) internal {
-        pool.borrow(address(mainToken), amount, AAVE_INTEREST_RATE_MODE_VARIABLE, 0, address(this));
+        pool().borrow(address(mainToken), amount, AAVE_INTEREST_RATE_MODE_VARIABLE, 0, address(this));
     }
 
     function debtRepay(uint256 amount) internal {
-        pool.repay(address(mainToken), amount, AAVE_INTEREST_RATE_MODE_VARIABLE, address(this));
+        pool().repay(address(mainToken), amount, AAVE_INTEREST_RATE_MODE_VARIABLE, address(this));
 
-        mainToken.transfer(address(pool), 0);
+        mainToken.transfer(address(pool()), 0);
     }
 
     function collateralSupply(uint256 amount) internal {
-        pool.supply(address(stableToken), amount, address(this), 0);
-        pool.setUserUseReserveAsCollateral(address(stableToken), true);
-        stableToken.transfer(address(pool), 0);
+        pool().supply(address(stableToken), amount, address(this), 0);
+        pool().setUserUseReserveAsCollateral(address(stableToken), true);
+        stableToken.transfer(address(pool()), 0);
     }
 
     function collateralWithdraw(uint256 amount) internal {
-        pool.withdraw(address(stableToken), amount, address(this));
+        pool().withdraw(address(stableToken), amount, address(this));
     }
 
     function swapMainToStable(uint256 amount) internal returns (uint256) {
@@ -704,12 +698,20 @@ contract DeltaNeutralDollar2 is ERC20Upgradeable, OwnableUpgradeable, UUPSUpgrad
     }
 
     function ltv() internal view returns (uint256) {
-        DataTypes.ReserveConfigurationMap memory poolConfiguration = pool.getConfiguration(address(stableToken));
+        DataTypes.ReserveConfigurationMap memory poolConfiguration = pool().getConfiguration(address(stableToken));
         return poolConfiguration.data & EXTRACT_LTV_FROM_POOL_CONFIGURATION_DATA_MASK;
     }
 
     /// @notice ERC20 method
     function decimals() public view virtual override returns (uint8) {
         return _decimals;
+    }
+
+    function pool() internal view returns (IPool) {
+        return IPool(aaveAddressProvider.getPool());
+    }
+
+    function oracle() internal view returns (IAaveOracle) {
+        return IAaveOracle(aaveAddressProvider.getPriceOracle());
     }
 }

@@ -73,6 +73,7 @@ module.exports = {
     compilers: [
       {
         version: '0.8.25',
+        evmVersion: `paris`,
         settings: {
           optimizer: {
             enabled: true,

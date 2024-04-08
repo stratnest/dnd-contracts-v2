@@ -110,14 +110,14 @@ contract DeltaNeutralDollar2 is ERC20Upgradeable, OwnableUpgradeable, UUPSUpgrad
     /// @param amount The DND withdrawal amount requested by user
     /// @param amountBase The amount that has been withdrawn denoted in Aave's base currency. This is for reference only
     /// as no actual transfers of Aave base currency ever happens
-    /// @param amountMain The actual amnount of `mainToken` that has been withdrawn from the position
+    /// @param amountMain The actual amount of `mainToken` that has been withdrawn from the position
     event PositionWithdraw(uint256 amount, uint256 amountBase, uint256 amountMain, address user);
 
     /// @notice This event is emitted when a deposit takes place
     /// @param amount The amount of that token user deposited
     /// @param amountBase The amount that has been deposited denoted in Aave's base currency. This is for reference only
     /// as no actual transfers of Aave base currency ever happens
-    /// @param amount The actual amnount of `mainToken` that has been deposited into the position
+    /// @param amount The actual amount of `mainToken` that has been deposited into the position
     event PositionDeposit(uint256 amount, uint256 amountBase, address user);
 
     /// @notice Actual constructor of this upgradeable contract
